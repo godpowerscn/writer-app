@@ -1,0 +1,27 @@
+name = "writer-app"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+# ============================================================
+# D1 Database — writing app's primary storage
+# ============================================================
+[[d1_databases]]
+binding = "DB"
+database_name = "writer-app-db"
+database_id = ""
+# After creating the database:
+#   npx wrangler d1 create writer-app-db
+#   → paste the database_id above
+
+# ============================================================
+# Static Assets — frontend served from the Worker
+# ============================================================
+[assets]
+directory = "./static"
+not_found_handling = "single-page-application"  # SPA fallback
+
+# ============================================================
+# Environment: production
+# ============================================================
+[env.production]
+vars = { ENVIRONMENT = "production" }

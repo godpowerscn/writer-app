@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writer App</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="app-title">Writer</h1>
+        <button class="btn-new" onclick="app.newArticle()" title="New Article (Ctrl+N)">+</button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="searchInput" placeholder="Search articles..." oninput="app.search(this.value)" />
+      </div>
+      <nav class="article-list" id="articleList"></nav>
+    </aside>
+
+    <!-- Main Editor Area -->
+    <main id="editor" class="editor">
+      <!-- Empty State -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">&#9997;</div>
+        <h2>Start Writing</h2>
+        <p>Create a new article or select one from the sidebar.</p>
+        <button class="btn-new-large" onclick="app.newArticle()">Create New Article</button>
+      </div>
+
+      <!-- Editor Content -->
+      <div id="editorContent" class="editor-content hidden">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <select id="statusSelect" onchange="app.onStatusChange()">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+            <select id="categorySelect" onchange="app.onCategoryChange()">
+              <option value="">No Category</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
+            <button class="btn-save" onclick="app.saveArticle()" title="Save (Ctrl+S)">Save</button>
+          </div>
+        </div>
+
+        <div class="editor-body">
+          <input
+            type="text"
+            id="titleInput"
+            class="title-input"
+            placeholder="Untitled"
+            oninput="app.onTitleChange()"
+          />
+          <div class="editor-area">
+            <textarea
+              id="contentInput"
+              class="content-input"
+              placeholder="Start writing in markdown..."
+              oninput="app.onContentChange()"
+            ></textarea>
+            <div id="preview" class="preview hidden"></div>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <span id="wordCount">0 words</span>
+          <span id="saveStatus"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Markdown renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
