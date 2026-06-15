@@ -8,7 +8,8 @@ let state = {
   isDirty: false, isPreview: false,
   selectedId: null, selectedFolderId: null,
   saveTimer: null, allTags: [],
-  expandedFolders: new Set(), // folder ids that are expanded
+  expandedFolders: new Set(),
+  fonts: [], activeFontId: null,
 };
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -83,7 +84,7 @@ const authUI = {
 const app = {
   state,
   async init() {
-    await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags()]);
+    await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags(), this.loadFonts()]);
     this.setupDragDrop();
     this.setupKeyboard();
   },
@@ -615,6 +616,82 @@ const app = {
   },
   showToast(msg, type = '') { const t = $('toast'); t.textContent = msg; t.className = 'toast ' + type + ' show'; setTimeout(() => t.classList.remove('show'), 2500); },
   escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; },
+
+  // ─── Fonts ────────────────────────────────────────────
+
+  async loadFonts() {
+    try { const r = await api('/fonts'); const d = await r.json(); state.fonts = d.fonts ?? []; state.activeFontId = d.activeFontId; this.applyFont(); } catch (e) {}
+  },
+  showSettings() {
+    $('settingsModal').classList.remove('hidden');
+    this.renderFonts();
+  },
+  hideSettings() { $('settingsModal').classList.add('hidden'); },
+  handleFontDrop(e) {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file) this.handleFontFile(file);
+  },
+  async handleFontFile(file) {
+    if (!file) return;
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (!['.ttf','.otf','.woff','.woff2'].includes(ext)) { this.showToast('Unsupported format', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { this.showToast('File too large (max 5MB)', 'error'); return; }
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const r = await fetch('/api/fonts', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: form });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'Upload failed'); }
+      await this.loadFonts(); this.renderFonts(); this.showToast('Font uploaded', 'success');
+    } catch (e) { this.showToast(e.message, 'error'); }
+  },
+  async renderFonts() {
+    const list = $('fontsList');
+    if (!state.fonts.length) { list.innerHTML = '<div class="settings-desc" style="margin-top:8px">No custom fonts yet.</div>'; return; }
+    list.innerHTML = '';
+    for (const font of state.fonts) {
+      const isActive = font.id === state.activeFontId;
+      const el = document.createElement('div');
+      el.className = 'font-item' + (isActive ? ' active' : '');
+      el.innerHTML = `
+        <div class="font-preview" style="font-family:var(--font-editor,monospace)">Aa</div>
+        <div class="font-info">
+          <div class="font-name">${this.escapeHtml(font.name)}</div>
+          <div class="font-meta">${(font.file_size / 1024).toFixed(0)} KB · ${font.format}</div>
+        </div>
+        <div class="font-actions">
+          <button class="${isActive?'active-btn':''}" onclick="app.activateFont('${font.id}')" title="${isActive?'Active':'Use this font'}">${isActive ? '&#10003;' : 'T'}</button>
+          <button onclick="app.deleteFont('${font.id}')" title="Delete">&#128465;</button>
+        </div>`;
+      list.appendChild(el);
+    }
+  },
+  async activateFont(id) {
+    try { const r = await api('/fonts/' + id + '/activate', { method: 'PUT' }); if (r.ok) { state.activeFontId = id; this.renderFonts(); this.applyFont(); this.showToast('Font activated', 'success'); } } catch (e) { this.showToast('Failed', 'error'); }
+  },
+  async deactivateFont() {
+    try { const r = await api('/fonts/active', { method: 'DELETE' }); if (r.ok) { state.activeFontId = null; this.renderFonts(); this.applyFont(); this.showToast('System font restored', 'success'); } } catch (e) { this.showToast('Failed', 'error'); }
+  },
+  async deleteFont(id) {
+    if (!confirm('Delete this font?')) return;
+    try { const r = await api('/fonts/' + id, { method: 'DELETE' }); if (r.ok) { if (state.activeFontId === id) state.activeFontId = null; await this.loadFonts(); this.renderFonts(); this.showToast('Font deleted', 'success'); } } catch (e) { this.showToast('Failed', 'error'); }
+  },
+  applyFont() {
+    const root = document.documentElement;
+    const existing = document.getElementById('customFontStyle');
+    if (existing) existing.remove();
+    root.style.removeProperty('--font-editor');
+    if (!state.activeFontId) return;
+    const font = state.fonts.find(f => f.id === state.activeFontId);
+    if (!font) return;
+    const token = getToken();
+    const fontUrl = `/api/fonts/${font.id}/file?token=${token}`;
+    const style = document.createElement('style');
+    style.id = 'customFontStyle';
+    style.textContent = '@font-face{font-family:"CustomEditorFont";src:url("' + fontUrl + '") format("' + font.format + '");font-display:swap}';
+    document.head.appendChild(style);
+    root.style.setProperty('--font-editor', '"CustomEditorFont"');
+  },
 };
 
 document.addEventListener('DOMContentLoaded', () => authUI.init());

@@ -1,5 +1,5 @@
 import type {
-  Article, Category, Tag, Folder,
+  Article, Category, Tag, Folder, Font,
   CreateArticleInput, UpdateArticleInput, CreateCategoryInput, CreateTagInput, CreateFolderInput,
   User, RegisterInput,
 } from './types';
@@ -272,4 +272,52 @@ export async function createTag(db: D1Database, input: CreateTagInput): Promise<
 export async function deleteTag(db: D1Database, id: string): Promise<boolean> {
   const result = await db.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
   return result.meta.changes > 0;
+}
+
+// ─── Fonts ────────────────────────────────────────────────
+
+export async function createFontRecord(db: D1Database, userId: string, name: string, format: string, r2Key: string, fileSize: number): Promise<Font> {
+  const id = generateId();
+  const now = new Date().toISOString();
+  await db
+    .prepare('INSERT INTO fonts (id, user_id, name, format, r2_key, file_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, name, format, r2Key, fileSize, now)
+    .run();
+  return { id, user_id: userId, name, format, r2_key: r2Key, file_size: fileSize, created_at: now };
+}
+
+export async function listFonts(db: D1Database, userId: string): Promise<Font[]> {
+  const rows = await db
+    .prepare('SELECT * FROM fonts WHERE user_id = ? ORDER BY created_at DESC')
+    .bind(userId)
+    .all();
+  return (rows.results ?? []) as unknown as Font[];
+}
+
+export async function getFont(db: D1Database, id: string, userId: string): Promise<Font | null> {
+  return db
+    .prepare('SELECT * FROM fonts WHERE id = ? AND user_id = ?')
+    .bind(id, userId)
+    .first<Font>();
+}
+
+export async function deleteFontRecord(db: D1Database, id: string, userId: string): Promise<Font | null> {
+  const font = await getFont(db, id, userId);
+  if (!font) return null;
+  await db.prepare('DELETE FROM fonts WHERE id = ? AND user_id = ?').bind(id, userId).run();
+  return font;
+}
+
+export async function setActiveFont(db: D1Database, userId: string, fontId: string | null): Promise<void> {
+  await db.prepare('UPDATE fonts SET is_active = 0 WHERE user_id = ?').bind(userId).run();
+  if (fontId) {
+    await db.prepare('UPDATE fonts SET is_active = 1 WHERE id = ? AND user_id = ?').bind(fontId, userId).run();
+  }
+}
+
+export async function getActiveFont(db: D1Database, userId: string): Promise<Font | null> {
+  return db
+    .prepare('SELECT * FROM fonts WHERE user_id = ? AND is_active = 1 LIMIT 1')
+    .bind(userId)
+    .first<Font>();
 }

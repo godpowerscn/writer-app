@@ -110,8 +110,19 @@ export interface PaginatedResponse<T> {
   pageSize: number;
 }
 
+export interface Font {
+  id: string;
+  user_id: string;
+  name: string;
+  format: string;
+  r2_key: string;
+  file_size: number;
+  created_at: string;
+}
+
 export interface Env {
   DB: D1Database;
+  FONT_BUCKET: R2Bucket;
   ENVIRONMENT: string;
   JWT_SECRET: string;
 }

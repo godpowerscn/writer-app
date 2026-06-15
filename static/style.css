@@ -206,7 +206,7 @@ body {
 .title-input::placeholder { color: var(--text-muted); }
 .editor-area { flex: 1; position: relative; overflow: hidden; }
 .content-input, .preview { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 0; border: none; outline: none; resize: none; font-size: 16px; line-height: 1.8; font-family: var(--font-sans); color: var(--text); background: transparent; overflow-y: auto; width: 100%; }
-.content-input { font-family: var(--font-mono); font-size: 14px; line-height: 1.7; }
+.content-input { font-family: var(--font-editor, var(--font-mono)); font-size: 14px; line-height: 1.7; }
 .content-input::placeholder { color: var(--text-muted); }
 
 .preview h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; letter-spacing: -0.3px; }
@@ -234,6 +234,31 @@ body {
 .folder-picker-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: background 0.1s; }
 .folder-picker-item:hover { background: var(--bg-hover); }
 .folder-picker-item.active { background: var(--accent); color: white; }
+
+/* Settings Modal */
+.settings-modal { min-width: 420px; max-width: 480px; max-height: 80vh; overflow-y: auto; }
+.settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.settings-header h3 { font-size: 17px; }
+.settings-header button { font-size: 20px; border: none; background: none; cursor: pointer; color: var(--text-muted); width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.settings-header button:hover { background: var(--bg-hover); }
+.settings-section { margin-bottom: 20px; }
+.settings-section h4 { font-size: 14px; margin-bottom: 4px; }
+.settings-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+.font-dropzone { border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; cursor: pointer; transition: border-color 0.15s; }
+.font-dropzone:hover { border-color: var(--accent); }
+.font-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; margin-top: 6px; border: 1px solid var(--border); }
+.font-item.active { border-color: var(--accent); background: rgba(59,130,246,0.04); }
+.font-preview { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 4px; background: var(--bg-secondary); flex-shrink: 0; }
+.font-info { flex: 1; min-width: 0; }
+.font-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.font-meta { font-size: 11px; color: var(--text-muted); }
+.font-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.font-actions button { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; }
+.font-actions button:hover { background: var(--bg-hover); }
+.font-actions button.active-btn { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* Editor Font Variable */
+:root { --font-editor: var(--font-mono); }
 
 /* Toast */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 10px 20px; border-radius: 8px; background: var(--text); color: white; font-size: 13px; opacity: 0; transition: all 0.3s; z-index: 100; pointer-events: none; }

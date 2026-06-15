@@ -15,6 +15,13 @@ database_id = "46c9a6a8-b206-4fcf-961a-cbca67ccd475"
 migrations_dir = "migrations"
 
 # ============================================================
+# R2 — font file storage
+# ============================================================
+[[r2_buckets]]
+bucket_name = "writer-app-fonts"
+binding = "FONT_BUCKET"
+
+# ============================================================
 # Static Assets — frontend served from the Worker
 # ============================================================
 [assets]
