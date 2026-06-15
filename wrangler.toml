@@ -2,6 +2,9 @@ name = "writer-app"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 
+[vars]
+JWT_SECRET = "78dceeeb0c4a084c3b87c05b84da525b20a44c685471b3e73b9f6f48d91b0678"
+
 # ============================================================
 # D1 Database — writing app's primary storage
 # ============================================================

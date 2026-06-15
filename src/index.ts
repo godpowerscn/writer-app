@@ -1,24 +1,41 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env } from './types';
+import type { AppBindings } from './types';
+import { verifyToken } from './auth';
 import articles from './routes/articles';
 import categories from './routes/categories';
 import tags from './routes/tags';
+import auth from './routes/auth';
+import folders from './routes/folders';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppBindings>();
 
-// CORS for development
 app.use('/api/*', cors());
 
-// API Routes
+app.use('/api/*', async (c, next) => {
+  if (c.req.path === '/api/auth/login' || c.req.path === '/api/auth/register') {
+    return next();
+  }
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: 'Authorization header required' }, 401);
+  }
+  const userId = await verifyToken(authHeader.slice(7), c.env);
+  if (!userId) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+  c.set('userId', userId);
+  await next();
+});
+
+app.route('/api/auth', auth);
 app.route('/api/articles', articles);
 app.route('/api/categories', categories);
 app.route('/api/tags', tags);
+app.route('/api/folders', folders);
 
-// Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// 404 for unrecognized API routes
 app.notFound((c) => {
   if (c.req.path.startsWith('/api')) {
     return c.json({ error: 'Not found' }, 404);

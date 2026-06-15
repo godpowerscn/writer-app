@@ -7,22 +7,51 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div id="app">
-    <!-- Sidebar -->
+  <div id="authScreen" class="auth-screen hidden">
+    <div class="auth-card">
+      <h1 class="auth-title">Writer</h1>
+      <p class="auth-subtitle">A minimal writing app</p>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login" onclick="authUI.switchTab('login')">Sign In</button>
+        <button class="auth-tab" data-tab="register" onclick="authUI.switchTab('register')">Register</button>
+      </div>
+      <form id="loginForm" onsubmit="authUI.login(event)">
+        <input type="email" placeholder="Email" required />
+        <input type="password" placeholder="Password" required minlength="6" />
+        <button type="submit" class="btn-auth">Sign In</button>
+        <p class="auth-error" id="loginError"></p>
+      </form>
+      <form id="registerForm" class="hidden" onsubmit="authUI.register(event)">
+        <input type="text" placeholder="Username" required minlength="2" />
+        <input type="email" placeholder="Email" required />
+        <input type="password" placeholder="Password" required minlength="6" />
+        <button type="submit" class="btn-auth">Create Account</button>
+        <p class="auth-error" id="registerError"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <h1 class="app-title">Writer</h1>
-        <button class="btn-new" onclick="app.newArticle()" title="New Article (Ctrl+N)">+</button>
+        <div class="sidebar-actions">
+          <button class="btn-icon-small" onclick="app.newFolder()" title="New Folder">+&#128193;</button>
+          <button class="btn-new" onclick="app.newArticle()" title="New Article (Ctrl+N)">+</button>
+        </div>
       </div>
       <div class="sidebar-search">
         <input type="text" id="searchInput" placeholder="Search articles..." oninput="app.search(this.value)" />
       </div>
+      <nav class="folder-tree" id="folderTree"></nav>
       <nav class="article-list" id="articleList"></nav>
+      <div class="sidebar-footer">
+        <span id="userInfo" class="user-info"></span>
+        <button class="btn-logout" onclick="authUI.logout()">Sign out</button>
+      </div>
     </aside>
 
-    <!-- Main Editor Area -->
     <main id="editor" class="editor">
-      <!-- Empty State -->
       <div id="emptyState" class="empty-state">
         <div class="empty-icon">&#9997;</div>
         <h2>Start Writing</h2>
@@ -30,7 +59,6 @@
         <button class="btn-new-large" onclick="app.newArticle()">Create New Article</button>
       </div>
 
-      <!-- Editor Content -->
       <div id="editorContent" class="editor-content hidden">
         <div class="editor-toolbar">
           <div class="toolbar-left">
@@ -41,28 +69,24 @@
             <select id="categorySelect" onchange="app.onCategoryChange()">
               <option value="">No Category</option>
             </select>
+            <button class="btn-icon-small" onclick="app.showFolderPicker()" title="Move to folder">+&#128193;</button>
           </div>
           <div class="toolbar-right">
             <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
             <button class="btn-save" onclick="app.saveArticle()" title="Save (Ctrl+S)">Save</button>
+            <button class="btn-delete" onclick="app.deleteArticle(app.state.selectedId)" title="Delete">&#128465;</button>
           </div>
         </div>
 
+        <div class="tags-bar" id="tagsBar">
+          <div class="tags-list" id="tagsList"></div>
+          <input type="text" id="tagInput" class="tag-input" placeholder="Add tag..." onkeydown="app.onTagKeydown(event)" />
+        </div>
+
         <div class="editor-body">
-          <input
-            type="text"
-            id="titleInput"
-            class="title-input"
-            placeholder="Untitled"
-            oninput="app.onTitleChange()"
-          />
+          <input type="text" id="titleInput" class="title-input" placeholder="Untitled" oninput="app.onTitleChange()" />
           <div class="editor-area">
-            <textarea
-              id="contentInput"
-              class="content-input"
-              placeholder="Start writing in markdown..."
-              oninput="app.onContentChange()"
-            ></textarea>
+            <textarea id="contentInput" class="content-input" placeholder="Start writing in markdown..." oninput="app.onContentChange()"></textarea>
             <div id="preview" class="preview hidden"></div>
           </div>
         </div>
@@ -75,10 +99,15 @@
     </main>
   </div>
 
-  <!-- Toast -->
-  <div id="toast" class="toast"></div>
+  <div id="folderModal" class="modal hidden" onclick="if(event.target===this)app.hideFolderPicker()">
+    <div class="modal-content">
+      <h3>Move to folder</h3>
+      <div id="folderPickerList" class="folder-picker-list"></div>
+      <button class="btn-auth" onclick="app.hideFolderPicker()" style="margin-top:8px;background:transparent;color:var(--text)">Cancel</button>
+    </div>
+  </div>
 
-  <!-- Markdown renderer -->
+  <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="/app.js"></script>
 </body>

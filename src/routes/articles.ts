@@ -1,15 +1,16 @@
 import { Hono } from 'hono';
-import type { Env, CreateArticleInput, UpdateArticleInput } from '../types';
+import type { AppBindings, CreateArticleInput, UpdateArticleInput } from '../types';
 import * as db from '../db';
 
-const articles = new Hono<{ Bindings: Env }>();
+const articles = new Hono<AppBindings>();
 
-// GET /api/articles — list with pagination & filters
 articles.get('/', async (c) => {
-  const { status, categoryId, page, pageSize, search } = c.req.query();
-  const result = await db.listArticles(c.env.DB, {
+  const userId = c.get('userId');
+  const { status, categoryId, folderId, page, pageSize, search } = c.req.query();
+  const result = await db.listArticles(c.env.DB, userId, {
     status,
     categoryId,
+    folderId,
     page: page ? parseInt(page) : 1,
     pageSize: pageSize ? parseInt(pageSize) : 20,
     search,
@@ -17,31 +18,31 @@ articles.get('/', async (c) => {
   return c.json(result);
 });
 
-// POST /api/articles — create
 articles.post('/', async (c) => {
+  const userId = c.get('userId');
   const input: CreateArticleInput = await c.req.json();
-  const article = await db.createArticle(c.env.DB, input);
+  const article = await db.createArticle(c.env.DB, userId, input);
   return c.json(article, 201);
 });
 
-// GET /api/articles/:id — get single
 articles.get('/:id', async (c) => {
-  const article = await db.getArticle(c.env.DB, c.req.param('id'));
+  const userId = c.get('userId');
+  const article = await db.getArticle(c.env.DB, c.req.param('id'), userId);
   if (!article) return c.json({ error: 'Article not found' }, 404);
   return c.json(article);
 });
 
-// PUT /api/articles/:id — update
 articles.put('/:id', async (c) => {
+  const userId = c.get('userId');
   const input: UpdateArticleInput = await c.req.json();
-  const article = await db.updateArticle(c.env.DB, c.req.param('id'), input);
+  const article = await db.updateArticle(c.env.DB, userId, c.req.param('id'), input);
   if (!article) return c.json({ error: 'Article not found' }, 404);
   return c.json(article);
 });
 
-// DELETE /api/articles/:id — delete
 articles.delete('/:id', async (c) => {
-  const deleted = await db.deleteArticle(c.env.DB, c.req.param('id'));
+  const userId = c.get('userId');
+  const deleted = await db.deleteArticle(c.env.DB, userId, c.req.param('id'));
   if (!deleted) return c.json({ error: 'Article not found' }, 404);
   return c.json({ success: true });
 });
