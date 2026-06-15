@@ -569,12 +569,7 @@ const app = {
       if (tag === 'img') {
         const src = node.getAttribute('src') || '';
         const alt = node.getAttribute('alt') || '';
-        const w = node.style.width || node.getAttribute('width') || '';
-        if (w) {
-          lines.push('![' + alt + '](' + src + ' =' + parseInt(w) + 'x)');
-        } else {
-          lines.push('![' + alt + '](' + src + ')');
-        }
+        lines.push('![' + alt + '](' + src + ')');
         return;
       }
       if (tag === 'code') {
