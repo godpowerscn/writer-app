@@ -847,69 +847,83 @@ const app = {
 
   // ─── Content Editable & Image Resize ──────────────
 
+  _selectedImg: null,
+
   setupContentEditable() {
     const editor = $('contentInput');
     editor.addEventListener('click', (e) => this._onEditorClick(e));
-    editor.addEventListener('mouseover', (e) => this._onEditorHover(e));
-    editor.addEventListener('mouseout', (e) => this._onEditorHoverOut(e));
+    document.addEventListener('click', (e) => {
+      if (this._selectedImg && !e.target.closest('#contentInput')) this._deselectImage();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this._selectedImg) this._deselectImage();
+    });
+    editor.addEventListener('scroll', () => { if (this._selectedImg) this._positionOverlay(); });
   },
 
   _onEditorClick(e) {
     const img = e.target.closest('img');
-    if (!img) return;
-    e.preventDefault();
-    this._selectImage(img);
+    if (img) {
+      e.preventDefault();
+      this._selectImage(img);
+      return;
+    }
+    if (this._selectedImg) this._deselectImage();
   },
 
   _selectImage(img) {
-    qa('.selected', $('contentInput')).forEach(el => el.classList.remove('selected'));
-    let wrap = img.parentElement;
-    if (!wrap.classList.contains('image-wrap')) {
-      wrap = document.createElement('span');
-      wrap.className = 'image-wrap selected';
-      img.parentNode.insertBefore(wrap, img);
-      wrap.appendChild(img);
-      const handle = document.createElement('span');
-      handle.className = 'resize-handle';
-      handle.addEventListener('mousedown', (e) => this._startResize(e, img));
-      wrap.appendChild(handle);
-    } else {
-      wrap.classList.add('selected');
+    this._deselectImage();
+    this._selectedImg = img;
+    img.classList.add('selected-img');
+    this._positionOverlay();
+    $('imageResizeOverlay').classList.remove('hidden');
+    // Attach resize drag to handle
+    const handle = $('resizeHandleSE');
+    handle.onmousedown = (e) => this._startResize(e, img);
+  },
+
+  _deselectImage() {
+    if (this._selectedImg) {
+      this._selectedImg.classList.remove('selected-img');
+      this._selectedImg = null;
     }
+    $('imageResizeOverlay').classList.add('hidden');
+  },
+
+  _positionOverlay() {
+    const img = this._selectedImg;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const overlay = $('imageResizeOverlay');
+    overlay.style.left = rect.left + 'px';
+    overlay.style.top = rect.top + 'px';
+    overlay.style.width = rect.width + 'px';
+    overlay.style.height = rect.height + 'px';
   },
 
   _startResize(e, img) {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startW = img.offsetWidth;
-    img.classList.add('resizing');
+    const startY = e.clientY;
+    const startW = img.getBoundingClientRect().width;
+    const startH = img.getBoundingClientRect().height;
 
     const onMove = (ev) => {
       const newW = Math.max(50, startW + (ev.clientX - startX));
+      const ratio = startH / startW;
+      const newH = Math.round(newW * ratio);
       img.style.width = newW + 'px';
-      img.style.maxWidth = newW + 'px';
+      img.style.height = newH + 'px';
+      this._positionOverlay();
     };
     const onUp = () => {
-      img.classList.remove('resizing');
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       state.isDirty = true;
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  },
-
-  _onEditorHover(e) {
-    const img = e.target.closest('img');
-    if (img && !img.classList.contains('resizing')) {
-      img.style.cursor = 'pointer';
-    }
-  },
-
-  _onEditorHoverOut(e) {
-    const img = e.target.closest('img');
-    if (img) img.style.cursor = '';
   },
 };
 
