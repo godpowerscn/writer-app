@@ -569,7 +569,14 @@ const app = {
       if (tag === 'img') {
         const src = node.getAttribute('src') || '';
         const alt = node.getAttribute('alt') || '';
-        lines.push('![' + alt + '](' + src + ')');
+        const w = node.getAttribute('width') || node.style.width || '';
+        const wNum = parseInt(w);
+        if (wNum > 0) {
+          // Persist custom width as raw HTML (marked passes it through)
+          lines.push('<img src="' + src + '" alt="' + alt + '" width="' + wNum + '">');
+        } else {
+          lines.push('![' + alt + '](' + src + ')');
+        }
         return;
       }
       if (tag === 'code') {
