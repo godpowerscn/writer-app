@@ -548,7 +548,7 @@ const app = {
     if (!state.activeTabId) return;
     tabCache[state.activeTabId] = {
       title: $('titleInput')?.value || '',
-      content: $('contentInput')?.innerHTML || '',
+      content: this._getMarkdown(),
       status: $('statusSelect')?.value || 'draft',
       category_id: $('categorySelect')?.value || null,
       tags: state.article?.tags ? JSON.parse(JSON.stringify(state.article.tags)) : [],
@@ -595,7 +595,10 @@ const app = {
     state.activeTabId = id;
     state.selectedId = id;
     state.isDirty = false;
-    this._loadTabCache(id);
+    const cached = tabCache[id];
+    if (cached) {
+      state.article = { id, ...cached };
+    }
     this.renderEditor();
     this.renderTree();
     this.renderTabs();
