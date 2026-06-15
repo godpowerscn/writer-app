@@ -534,18 +534,135 @@ const app = {
     try { const r = await api(`/articles/${id}`); if (!r.ok) throw new Error(); state.article = await r.json(); this.renderEditor(); this.renderTree(); } catch (e) { this.showToast('Failed to load article', 'error'); }
   },
   _getMarkdown() {
-    const html = $('contentInput').innerHTML;
-    if (!html || html === '<br>' || html === '<br>') return '';
-    if (window.turndown) {
-      const turndownService = new window.turndown({
-        headingStyle: 'atx',
-        codeBlockStyle: 'fenced',
-        emDelimiter: '*',
-        bulletListMarker: '-',
-      });
-      return turndownService.turndown(html);
+    const editor = $('contentInput');
+    if (!editor.innerHTML || editor.innerHTML === '<br>') return '';
+    return this._htmlToMarkdown(editor);
+  },
+
+  _htmlToMarkdown(root) {
+    const lines = [];
+    const walk = (node, prefix) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        if (text) lines.push(text);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = node.tagName.toLowerCase();
+      // Collect children text first, then wrap with markers
+      const childLines = [];
+      const savedLines = lines;
+      const childText = () => {
+        const start = lines.length;
+        for (const child of node.childNodes) walk(child);
+        return lines.splice(start).join('').replace(/\s+/g, ' ').trim();
+      };
+
+      // Inline elements — push text directly
+      if (tag === 'strong' || tag === 'b') { lines.push('**' + childText() + '**'); return; }
+      if (tag === 'em' || tag === 'i') { lines.push('*' + childText() + '*'); return; }
+      if (tag === 'a') {
+        const href = node.getAttribute('href') || '';
+        lines.push('[' + childText() + '](' + href + ')');
+        return;
+      }
+      if (tag === 'img') {
+        const src = node.getAttribute('src') || '';
+        const alt = node.getAttribute('alt') || '';
+        const w = node.style.width || node.getAttribute('width') || '';
+        if (w) {
+          lines.push('![' + alt + '](' + src + ' =' + parseInt(w) + 'x)');
+        } else {
+          lines.push('![' + alt + '](' + src + ')');
+        }
+        return;
+      }
+      if (tag === 'code') {
+        lines.push('`' + (node.textContent || '') + '`');
+        return;
+      }
+      if (tag === 'br') { lines.push('\n'); return; }
+
+      // Block elements — collect sub-lines then append with formatting
+      const collectSubLines = () => {
+        const start = lines.length;
+        const subLines = [];
+        let paraAccum = '';
+        for (const child of node.childNodes) {
+          const beforeLen = lines.length;
+          walk(child);
+          if (lines.length > beforeLen) {
+            // Flush accumulated paragraph text
+            if (paraAccum) { subLines.push(paraAccum); paraAccum = ''; }
+            subLines.push(lines.splice(beforeLen).join(''));
+          } else {
+            // It's phrasing content — accumulate
+            const text = child.textContent || '';
+            if (child.nodeType === Node.TEXT_NODE && text.trim()) {
+              paraAccum += text.trim() + ' ';
+            }
+          }
+        }
+        if (paraAccum) subLines.push(paraAccum.trim());
+        return subLines;
+      };
+
+      if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
+        const level = '#'.repeat(parseInt(tag[1]));
+        const t = childText();
+        lines.push(level + ' ' + t);
+        lines.push('');
+        return;
+      }
+      if (tag === 'p') {
+        const t = childText();
+        if (t) { lines.push(t); lines.push(''); }
+        return;
+      }
+      if (tag === 'blockquote') {
+        const qLines = collectSubLines();
+        for (const ql of qLines) lines.push('> ' + ql);
+        lines.push('');
+        return;
+      }
+      if (tag === 'ul' || tag === 'ol') {
+        let idx = 1;
+        for (const li of node.children) {
+          if (li.tagName !== 'LI') continue;
+          const marker = tag === 'ul' ? '-' : (idx++) + '.';
+          // For list items, walk children manually
+          const start = lines.length;
+          for (const child of li.childNodes) walk(child);
+          const itemText = lines.splice(start).join('').replace(/\s+/g, ' ').trim();
+          lines.push(marker + ' ' + itemText);
+        }
+        lines.push('');
+        return;
+      }
+      if (tag === 'pre') {
+        const code = node.querySelector('code');
+        const codeText = code ? code.textContent : node.textContent;
+        lines.push('```');
+        lines.push(codeText);
+        lines.push('```');
+        lines.push('');
+        return;
+      }
+      if (tag === 'hr') { lines.push('---'); lines.push(''); return; }
+      // div, span, unknown — pass through children
+      for (const child of node.childNodes) walk(child);
+    };
+    walk(root, '');
+    // Clean up: remove duplicate blank lines
+    const result = [];
+    let prevBlank = false;
+    for (const line of lines) {
+      const blank = line.trim() === '';
+      if (blank && prevBlank) continue;
+      result.push(line);
+      prevBlank = blank;
     }
-    return $('contentInput').textContent || '';
+    return result.join('\n').trim();
   },
 
   async saveArticle() {
@@ -604,8 +721,11 @@ const app = {
     $('titleInput').value = state.article.title || '';
     const md = state.article.content || '';
     this._isRendering = true;
-    $('contentInput').innerHTML = md ? (window.marked ? marked.parse(md) : '') : '';
-    this._isRendering = false;
+    try {
+      $('contentInput').innerHTML = md ? (window.marked ? marked.parse(md) : '') : '';
+    } finally {
+      this._isRendering = false;
+    }
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
     this.renderTags(); this.updateWordCount(); state.isDirty = false; $('saveStatus').textContent = '';
   },
