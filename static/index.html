@@ -36,15 +36,14 @@
       <div class="sidebar-header">
         <h1 class="app-title">Writer</h1>
         <div class="sidebar-actions">
-          <button class="btn-icon-small" onclick="app.newFolder()" title="New Folder">+&#128193;</button>
+          <button class="btn-icon-small" onclick="app.newFolder()" title="New Folder">&#128193;</button>
           <button class="btn-new" onclick="app.newArticle()" title="New Article (Ctrl+N)">+</button>
         </div>
       </div>
       <div class="sidebar-search">
         <input type="text" id="searchInput" placeholder="Search articles..." oninput="app.search(this.value)" />
       </div>
-      <nav class="folder-tree" id="folderTree"></nav>
-      <nav class="article-list" id="articleList"></nav>
+      <nav class="tree-view" id="treeView"></nav>
       <div class="sidebar-footer">
         <span id="userInfo" class="user-info"></span>
         <button class="btn-logout" onclick="authUI.logout()">Sign out</button>
@@ -69,7 +68,7 @@
             <select id="categorySelect" onchange="app.onCategoryChange()">
               <option value="">No Category</option>
             </select>
-            <button class="btn-icon-small" onclick="app.showFolderPicker()" title="Move to folder">+&#128193;</button>
+            <button class="btn-icon-small" onclick="app.showFolderPicker()" title="Move to folder">&#128193;</button>
           </div>
           <div class="toolbar-right">
             <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
