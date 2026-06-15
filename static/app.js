@@ -535,25 +535,13 @@ const app = {
   },
   _getMarkdown() {
     const html = $('contentInput').innerHTML;
-    if (!html || html === '<br>') return '';
-    // Use turndown to convert HTML back to markdown
+    if (!html || html === '<br>' || html === '<br>') return '';
     if (window.turndown) {
       const turndownService = new window.turndown({
         headingStyle: 'atx',
         codeBlockStyle: 'fenced',
         emDelimiter: '*',
         bulletListMarker: '-',
-      });
-      turndownService.addRule('imageWrap', {
-        filter: (node) => node.classList?.contains('image-wrap'),
-        replacement: (content, node) => {
-          const img = node.querySelector('img');
-          if (!img) return content;
-          const src = img.getAttribute('src') || '';
-          const alt = img.getAttribute('alt') || '';
-          const w = img.getAttribute('width') || img.style.width;
-          return w ? `![${alt}](${src} =${w.replace('px', '')}x)` : `![${alt}](${src})`;
-        }
       });
       return turndownService.turndown(html);
     }
@@ -577,7 +565,7 @@ const app = {
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
   onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; this.renderTree(); } },
-  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); },
+  onContentChange() { if (this._isRendering) return; state.isDirty = true; this.autoSave(); this.updateWordCount(); },
 
   // ─── Tags ──────────────────────────────────────────
 
@@ -615,7 +603,9 @@ const app = {
     $('emptyState').classList.add('hidden'); $('editorContent').classList.remove('hidden');
     $('titleInput').value = state.article.title || '';
     const md = state.article.content || '';
-    $('contentInput').innerHTML = md ? (window.marked ? marked.parse(md) : md) : '';
+    this._isRendering = true;
+    $('contentInput').innerHTML = md ? (window.marked ? marked.parse(md) : '') : '';
+    this._isRendering = false;
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
     this.renderTags(); this.updateWordCount(); state.isDirty = false; $('saveStatus').textContent = '';
   },
