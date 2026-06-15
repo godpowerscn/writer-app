@@ -120,9 +120,22 @@ export interface Font {
   created_at: string;
 }
 
+export interface Image {
+  id: string;
+  user_id: string;
+  name: string;
+  alt_text: string;
+  r2_key: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  url?: string;
+}
+
 export interface Env {
   DB: D1Database;
   FONT_BUCKET: R2Bucket;
+  IMAGE_BUCKET: R2Bucket;
   ENVIRONMENT: string;
   JWT_SECRET: string;
 }

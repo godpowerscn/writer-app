@@ -260,6 +260,36 @@ body {
 /* Editor Font Variable */
 :root { --font-editor: var(--font-mono); }
 
+/* Image Modal */
+.image-modal { min-width: 460px; max-width: 520px; }
+.image-modal-tabs { display: flex; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.image-tab { flex: 1; padding: 8px; border: none; background: var(--bg); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary); transition: all 0.15s; }
+.image-tab.active { background: var(--accent); color: white; }
+.image-tab-content { min-height: 200px; }
+
+.image-dropzone {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 32px 24px;
+  text-align: center; cursor: pointer; transition: border-color 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.image-dropzone:hover { border-color: var(--accent); }
+.image-dropzone .dropzone-icon { font-size: 32px; opacity: 0.4; }
+.image-dropzone .dropzone-hint { font-size: 11px; color: var(--text-muted); }
+
+.image-upload-preview { display: flex; flex-direction: column; gap: 12px; }
+.image-upload-preview img { max-width: 100%; max-height: 200px; border-radius: 8px; object-fit: contain; background: var(--bg-secondary); }
+.image-upload-info { display: flex; flex-direction: column; gap: 8px; }
+.image-upload-info input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+.image-upload-info input:focus { border-color: var(--accent); }
+.image-upload-actions { display: flex; gap: 8px; }
+.image-upload-actions .btn-auth { flex: 1; }
+
+.image-url-form { display: flex; flex-direction: column; gap: 8px; }
+.image-url-form input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+.image-url-form input:focus { border-color: var(--accent); }
+.image-url-preview { margin-top: 4px; }
+.image-url-preview img { max-width: 100%; max-height: 150px; border-radius: 6px; object-fit: contain; background: var(--bg-secondary); }
+
 /* Toast */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 10px 20px; border-radius: 8px; background: var(--text); color: white; font-size: 13px; opacity: 0; transition: all 0.3s; z-index: 100; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

@@ -45,6 +45,40 @@ fonts.post('/', async (c) => {
   return c.json(font, 201);
 });
 
+// Streaming upload — raw font bytes, no multipart overhead
+fonts.post('/stream', async (c) => {
+  const userId = c.get('userId');
+  const rawName = c.req.header('X-Font-Name') || 'Untitled';
+  const ext = (c.req.header('X-Font-Ext') || 'ttf').toLowerCase();
+  const contentType = c.req.header('Content-Type') || 'application/octet-stream';
+  const contentLength = parseInt(c.req.header('Content-Length') || '0', 10);
+
+  const formatMap: Record<string, string> = { ttf: 'truetype', woff: 'woff', woff2: 'woff2', otf: 'opentype' };
+  const format = formatMap[ext] || 'truetype';
+  if (!['truetype', 'woff', 'woff2', 'opentype'].includes(format)) {
+    return c.json({ error: 'Unsupported font format' }, 400);
+  }
+
+  if (contentLength > 50 * 1024 * 1024) {
+    return c.json({ error: 'Font file too large. Max 50MB' }, 400);
+  }
+
+  const existing = await db.listFonts(c.env.DB, userId);
+  if (existing.length >= 10) {
+    return c.json({ error: 'Maximum 10 fonts allowed. Delete one first.' }, 400);
+  }
+
+  const name = rawName.replace(/\.[^.]+$/, '');
+  const r2Key = `${userId}/${db.generateId()}.${ext}`;
+
+  await c.env.FONT_BUCKET.put(r2Key, c.req.raw.body, {
+    httpMetadata: { contentType },
+  });
+
+  const font = await db.createFontRecord(c.env.DB, userId, name, format, r2Key, contentLength);
+  return c.json(font, 201);
+});
+
 fonts.get('/:id/file', async (c) => {
   const userId = c.get('userId');
   const font = await db.getFont(c.env.DB, c.req.param('id'), userId);

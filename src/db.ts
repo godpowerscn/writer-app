@@ -1,5 +1,5 @@
 import type {
-  Article, Category, Tag, Folder, Font,
+  Article, Category, Tag, Folder, Font, Image,
   CreateArticleInput, UpdateArticleInput, CreateCategoryInput, CreateTagInput, CreateFolderInput,
   User, RegisterInput,
 } from './types';
@@ -320,4 +320,46 @@ export async function getActiveFont(db: D1Database, userId: string): Promise<Fon
     .prepare('SELECT * FROM fonts WHERE user_id = ? AND is_active = 1 LIMIT 1')
     .bind(userId)
     .first<Font>();
+}
+
+// ─── Images ──────────────────────────────────────────────
+
+export async function createImageRecord(
+  db: D1Database,
+  userId: string,
+  name: string,
+  r2Key: string,
+  fileSize: number,
+  mimeType: string,
+  altText?: string
+): Promise<Image> {
+  const id = generateId();
+  const now = new Date().toISOString();
+  await db
+    .prepare('INSERT INTO images (id, user_id, name, alt_text, r2_key, file_size, mime_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, userId, name, altText ?? '', r2Key, fileSize, mimeType, now)
+    .run();
+  return { id, user_id: userId, name, alt_text: altText ?? '', r2_key: r2Key, file_size: fileSize, mime_type: mimeType, created_at: now };
+}
+
+export async function listImages(db: D1Database, userId: string): Promise<Image[]> {
+  const rows = await db
+    .prepare('SELECT * FROM images WHERE user_id = ? ORDER BY created_at DESC')
+    .bind(userId)
+    .all();
+  return (rows.results ?? []) as unknown as Image[];
+}
+
+export async function getImage(db: D1Database, id: string, userId: string): Promise<Image | null> {
+  return db
+    .prepare('SELECT * FROM images WHERE id = ? AND user_id = ?')
+    .bind(id, userId)
+    .first<Image>();
+}
+
+export async function deleteImageRecord(db: D1Database, id: string, userId: string): Promise<Image | null> {
+  const image = await getImage(db, id, userId);
+  if (!image) return null;
+  await db.prepare('DELETE FROM images WHERE id = ? AND user_id = ?').bind(id, userId).run();
+  return image;
 }

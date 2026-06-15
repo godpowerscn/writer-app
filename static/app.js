@@ -634,14 +634,18 @@ const app = {
   },
   async handleFontFile(file) {
     if (!file) return;
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
-    if (!['.ttf','.otf','.woff','.woff2'].includes(ext)) { this.showToast('Unsupported format', 'error'); return; }
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['ttf','otf','woff','woff2'].includes(ext)) { this.showToast('Unsupported format', 'error'); return; }
     if (file.size > 50 * 1024 * 1024) { this.showToast('File too large (max 50MB)', 'error'); return; }
-    const form = new FormData();
-    form.append('file', file);
+    const name = file.name.replace(/\.[^.]+$/, '');
+    const token = getToken();
     try {
-      const r = await fetch('/api/fonts', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: form });
-      if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'Upload failed'); }
+      const r = await fetch('/api/fonts/stream', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'X-Font-Name': name, 'X-Font-Ext': ext, 'Content-Length': file.size.toString() },
+        body: file
+      });
+      if (!r.ok) { let err; try { const d = await r.json(); err = d.error; } catch {}; throw new Error(err || 'Upload failed'); }
       await this.loadFonts(); this.renderFonts(); this.showToast('Font uploaded', 'success');
     } catch (e) { this.showToast(e.message, 'error'); }
   },
@@ -691,6 +695,121 @@ const app = {
     style.textContent = '@font-face{font-family:"CustomEditorFont";src:url("' + fontUrl + '") format("' + font.format + '");font-display:swap}';
     document.head.appendChild(style);
     root.style.setProperty('--font-editor', '"CustomEditorFont"');
+  },
+
+  // ─── Image Insertion ────────────────────────────────
+
+  _pendingImageFile: null,
+  _imageState: {},
+
+  showImagePicker() {
+    if (!state.article) return;
+    $('imageModal').classList.remove('hidden');
+    this.clearImageUpload();
+    this.switchImageTab('upload');
+  },
+  hideImagePicker() { $('imageModal').classList.add('hidden'); this.clearImageUpload(); },
+
+  switchImageTab(tab) {
+    qa('.image-tab').forEach(t => t.classList.remove('active'));
+    q(`[data-imagetab="${tab}"]`).classList.add('active');
+    $('imageUploadTab').classList.toggle('hidden', tab !== 'upload');
+    $('imageUrlTab').classList.toggle('hidden', tab !== 'url');
+  },
+
+  handleImageDrop(e) {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file) this.handleImageFile(file);
+  },
+
+  handleImageFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { this.showToast('Please select an image file', 'error'); return; }
+    if (file.size > 20 * 1024 * 1024) { this.showToast('Image too large (max 20MB)', 'error'); return; }
+
+    this._pendingImageFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      $('imageUploadPreview').classList.remove('hidden');
+      $('imagePreviewImg').src = e.target.result;
+      $('imageAltInput').value = '';
+    };
+    reader.readAsDataURL(file);
+    $('imageDropzone').classList.add('hidden');
+  },
+
+  clearImageUpload() {
+    this._pendingImageFile = null;
+    this._imageState = {};
+    $('imageUploadPreview').classList.add('hidden');
+    $('imageDropzone').classList.remove('hidden');
+    $('imagePreviewImg').src = '';
+    $('imageAltInput').value = '';
+    $('imageUrlInput').value = '';
+    $('imageUrlAltInput').value = '';
+    $('imageUrlPreview').classList.add('hidden');
+    $('imageUrlPreviewImg').src = '';
+  },
+
+  async uploadImage() {
+    const file = this._pendingImageFile;
+    if (!file) return;
+    const alt = $('imageAltInput').value.trim() || '';
+
+    const token = getToken();
+    try {
+      const r = await fetch('/api/images/stream', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/octet-stream',
+          'X-Image-Name': file.name,
+          'X-Image-Mime': file.type,
+          'X-Image-Alt': alt,
+          'Content-Length': file.size.toString(),
+        },
+        body: file,
+      });
+      if (!r.ok) { let err; try { const d = await r.json(); err = d.error; } catch {}; throw new Error(err || 'Upload failed'); }
+      const img = await r.json();
+      const imgUrl = `/api/images/${img.id}/file?token=${token}`;
+      this.insertMarkdown('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
+      this.hideImagePicker();
+      this.showToast('Image inserted', 'success');
+    } catch (e) { this.showToast(e.message, 'error'); }
+  },
+
+  previewImageUrl(url) {
+    const preview = $('imageUrlPreview');
+    const img = $('imageUrlPreviewImg');
+    if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'))) {
+      preview.classList.remove('hidden');
+      img.src = url;
+    } else {
+      preview.classList.add('hidden');
+      img.src = '';
+    }
+  },
+
+  insertImageFromUrl() {
+    const url = $('imageUrlInput').value.trim();
+    if (!url) { this.showToast('Please enter an image URL', 'error'); return; }
+    const alt = $('imageUrlAltInput').value.trim() || '';
+    this.insertMarkdown('![' + alt + '](' + url + ')');
+    this.hideImagePicker();
+    this.showToast('Image inserted', 'success');
+  },
+
+  insertMarkdown(md) {
+    const ta = $('contentInput');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    ta.value = text.substring(0, start) + md + text.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + md.length;
+    ta.focus();
+    this.onContentChange();
   },
 };
 

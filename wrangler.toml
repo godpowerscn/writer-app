@@ -22,6 +22,13 @@ bucket_name = "writer-app-fonts"
 binding = "FONT_BUCKET"
 
 # ============================================================
+# R2 — image storage for article images
+# ============================================================
+[[r2_buckets]]
+bucket_name = "writer-app-images"
+binding = "IMAGE_BUCKET"
+
+# ============================================================
 # Static Assets — frontend served from the Worker
 # ============================================================
 [assets]

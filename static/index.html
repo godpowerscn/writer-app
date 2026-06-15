@@ -74,6 +74,7 @@
             <button class="btn-icon-small" onclick="app.showFolderPicker()" title="Move to folder">&#128193;</button>
           </div>
           <div class="toolbar-right">
+            <button class="btn-icon" onclick="app.showImagePicker()" title="Insert Image">&#128247;</button>
             <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
             <button class="btn-save" onclick="app.saveArticle()" title="Save (Ctrl+S)">Save</button>
             <button class="btn-delete" onclick="app.deleteArticle(app.state.selectedId)" title="Delete">&#128465;</button>
@@ -124,6 +125,49 @@
           <button class="btn-auth" onclick="document.getElementById('fontFileInput').click()" style="width:auto;padding:6px 16px;margin-top:8px">Browse</button>
         </div>
         <div id="fontsList"></div>
+      </div>
+    </div>
+  </div>
+  <div id="imageModal" class="modal hidden" onclick="if(event.target===this)app.hideImagePicker()">
+    <div class="modal-content image-modal">
+      <div class="settings-header">
+        <h3>Insert Image</h3>
+        <button class="btn-icon-small" onclick="app.hideImagePicker()">&times;</button>
+      </div>
+      <div class="image-modal-tabs">
+        <button class="image-tab active" data-imagetab="upload" onclick="app.switchImageTab('upload')">Upload</button>
+        <button class="image-tab" data-imagetab="url" onclick="app.switchImageTab('url')">From URL</button>
+      </div>
+
+      <div id="imageUploadTab" class="image-tab-content">
+        <div class="image-dropzone" id="imageDropzone" ondragover="event.preventDefault()" ondrop="app.handleImageDrop(event)">
+          <span class="dropzone-icon">&#128247;</span>
+          <span>Drop an image here or click to browse</span>
+          <span class="dropzone-hint">Supported: JPEG, PNG, GIF, WebP, SVG (up to 20MB)</span>
+          <input type="file" id="imageFileInput" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff" hidden onchange="app.handleImageFile(this.files[0])" />
+          <button class="btn-auth" onclick="document.getElementById('imageFileInput').click()" style="width:auto;padding:6px 16px;margin-top:8px">Browse</button>
+        </div>
+        <div id="imageUploadPreview" class="image-upload-preview hidden">
+          <img id="imagePreviewImg" alt="Preview" />
+          <div class="image-upload-info">
+            <input type="text" id="imageAltInput" placeholder="Alt text (optional)" />
+            <div class="image-upload-actions">
+              <button class="btn-auth" onclick="app.uploadImage()">Insert Image</button>
+              <button class="btn-auth" onclick="app.clearImageUpload()" style="background:transparent;color:var(--text);border:1px solid var(--border)">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="imageUrlTab" class="image-tab-content hidden">
+        <div class="image-url-form">
+          <input type="text" id="imageUrlInput" placeholder="Image URL (https://...)" oninput="app.previewImageUrl(this.value)" />
+          <input type="text" id="imageUrlAltInput" placeholder="Alt text (optional)" />
+          <div class="image-url-preview hidden" id="imageUrlPreview">
+            <img id="imageUrlPreviewImg" alt="URL preview" />
+          </div>
+          <button class="btn-auth" onclick="app.insertImageFromUrl()" style="margin-top:8px">Insert Image</button>
+        </div>
       </div>
     </div>
   </div>
