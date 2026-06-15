@@ -636,7 +636,7 @@ const app = {
     if (!file) return;
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (!['.ttf','.otf','.woff','.woff2'].includes(ext)) { this.showToast('Unsupported format', 'error'); return; }
-    if (file.size > 5 * 1024 * 1024) { this.showToast('File too large (max 5MB)', 'error'); return; }
+    if (file.size > 50 * 1024 * 1024) { this.showToast('File too large (max 50MB)', 'error'); return; }
     const form = new FormData();
     form.append('file', file);
     try {

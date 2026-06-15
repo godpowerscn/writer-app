@@ -117,7 +117,7 @@
       </div>
       <div class="settings-section">
         <h4>Editor Font</h4>
-        <p class="settings-desc">Upload a custom font for the editor. Supported: .ttf, .otf, .woff, .woff2 (max 5MB, up to 10 fonts).</p>
+        <p class="settings-desc">Upload a custom font for the editor. Supported: .ttf, .otf, .woff, .woff2 (up to 50MB, max 10 fonts).</p>
         <div class="font-dropzone" id="fontDropzone" ondragover="event.preventDefault()" ondrop="app.handleFontDrop(event)">
           <span>Drop a font file here or click to browse</span>
           <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff,.woff2" hidden onchange="app.handleFontFile(this.files[0])" />

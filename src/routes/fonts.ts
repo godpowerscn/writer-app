@@ -25,8 +25,8 @@ fonts.post('/', async (c) => {
     return c.json({ error: 'Unsupported font format. Supported: .ttf, .otf, .woff, .woff2' }, 400);
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    return c.json({ error: 'Font file too large. Max 5MB' }, 400);
+  if (file.size > 50 * 1024 * 1024) {
+    return c.json({ error: 'Font file too large. Max 50MB' }, 400);
   }
 
   const existing = await db.listFonts(c.env.DB, userId);
