@@ -545,7 +545,7 @@ const app = {
     this._openTab(id, false);
   },
 
-  _getMarkdown() { return vditor ? vditor.getValue() : ''; },
+  _getMarkdown() { return (vditor && _vditorReady) ? vditor.getValue() : ''; },
 
   _saveCurrentTabCache() {
     if (!state.activeTabId) return;
@@ -802,7 +802,7 @@ const app = {
   },
 
   updateWordCount() {
-    const t = vditor ? vditor.getValue() : '';
+    const t = (vditor && _vditorReady) ? vditor.getValue() : '';
     const w = t.trim() ? t.trim().split(/\s+/).length : 0;
     const c = t.length;
     $('wordCount').textContent = c > 0 ? w + ' words · ' + c + ' chars' : '0 words';
@@ -1019,7 +1019,7 @@ const app = {
       if (!r.ok) { let err; try { const d = await r.json(); err = d.error; } catch {}; throw new Error(err || 'Upload failed'); }
       const img = await r.json();
       const imgUrl = '/api/images/' + img.id + '/file?token=' + token;
-      if (vditor) vditor.insertValue('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
+      if (vditor && _vditorReady) vditor.insertValue('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
       this.hideImagePicker();
       this.showToast('Image inserted', 'success');
     } catch (e) { this.showToast(e.message, 'error'); }
@@ -1041,7 +1041,7 @@ const app = {
     const url = $('imageUrlInput').value.trim();
     if (!url) { this.showToast('Please enter an image URL', 'error'); return; }
     const alt = $('imageUrlAltInput').value.trim() || '';
-    if (vditor) vditor.insertValue('![' + alt + '](' + url + ')');
+    if (vditor && _vditorReady) vditor.insertValue('![' + alt + '](' + url + ')');
     this.hideImagePicker();
     this.showToast('Image inserted', 'success');
   },
