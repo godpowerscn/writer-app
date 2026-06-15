@@ -530,7 +530,7 @@ const app = {
   async selectArticle(id) {
     if (state.isDirty && !confirm('You have unsaved changes. Discard them?')) return;
     state.selectedId = id; state.isDirty = false; state.isPreview = false;
-    $('previewBtn').classList.remove('active'); $('preview').classList.add('hidden'); $('contentInput').classList.remove('hidden');
+    $('previewBtn').classList.remove('active');
     try { const r = await api(`/articles/${id}`); if (!r.ok) throw new Error(); state.article = await r.json(); this.renderEditor(); this.renderTree(); } catch (e) { this.showToast('Failed to load article', 'error'); }
   },
   async saveArticle() {
@@ -549,7 +549,7 @@ const app = {
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
   onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; this.renderTree(); } },
-  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); },
+  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); this.renderPreview(); },
 
   // ─── Tags ──────────────────────────────────────────
 
@@ -583,22 +583,33 @@ const app = {
   // ─── Preview ──────────────────────────────────────
 
   togglePreview() {
-    state.isPreview = !state.isPreview;
-    $('previewBtn').classList.toggle('active', state.isPreview);
-    if (state.isPreview) {
-      $('preview').classList.remove('hidden'); $('contentInput').classList.add('hidden');
-      $('preview').innerHTML = window.marked ? marked.parse($('contentInput').value) : $('contentInput').value;
-    } else { $('preview').classList.add('hidden'); $('contentInput').classList.remove('hidden'); }
+    const area = $('editor-area');
+    if (area.classList.contains('split')) {
+      area.classList.replace('split', 'preview-only');
+      $('previewBtn').classList.add('active');
+    } else if (area.classList.contains('preview-only')) {
+      area.classList.replace('preview-only', 'edit-only');
+      $('previewBtn').classList.remove('active');
+    } else {
+      area.classList.replace('edit-only', 'split');
+      $('previewBtn').classList.remove('active');
+    }
+    state.isPreview = area.classList.contains('preview-only');
   },
 
   // ─── Editor ───────────────────────────────────────
+
+  renderPreview() {
+    $('preview').innerHTML = window.marked ? marked.parse($('contentInput').value) : $('contentInput').value;
+  },
 
   renderEditor() {
     if (!state.article) { $('emptyState').classList.remove('hidden'); $('editorContent').classList.add('hidden'); return; }
     $('emptyState').classList.add('hidden'); $('editorContent').classList.remove('hidden');
     $('titleInput').value = state.article.title || ''; $('contentInput').value = state.article.content || '';
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
-    this.renderTags(); this.updateWordCount(); state.isDirty = false; $('saveStatus').textContent = '';
+    $('editor-area').className = 'editor-area split';
+    this.renderTags(); this.updateWordCount(); this.renderPreview(); state.isDirty = false; $('saveStatus').textContent = '';
   },
   updateWordCount() {
     const t = $('contentInput').value; const w = t.trim() ? t.trim().split(/\s+/).length : 0; const c = t.length;

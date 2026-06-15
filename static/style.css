@@ -204,10 +204,21 @@ body {
 .editor-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 24px 48px; max-width: 800px; width: 100%; margin: 0 auto; }
 .title-input { width: 100%; border: none; font-size: 32px; font-weight: 700; color: var(--text); outline: none; padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); font-family: var(--font-sans); letter-spacing: -0.5px; line-height: 1.3; }
 .title-input::placeholder { color: var(--text-muted); }
-.editor-area { flex: 1; position: relative; overflow: hidden; }
-.content-input, .preview { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 0; border: none; outline: none; resize: none; font-size: 16px; line-height: 1.8; font-family: var(--font-sans); color: var(--text); background: transparent; overflow-y: auto; width: 100%; }
-.content-input { font-family: var(--font-editor, var(--font-mono)); font-size: 14px; line-height: 1.7; }
+.editor-area { flex: 1; display: flex; flex-direction: row; gap: 0; overflow: hidden; position: relative; }
+.content-input, .preview { flex: 1; width: 50%; min-width: 0; padding: 16px 24px; border: none; outline: none; font-size: 16px; line-height: 1.8; font-family: var(--font-sans); color: var(--text); background: transparent; overflow-y: auto; }
+.content-input { font-family: var(--font-editor, var(--font-mono)); font-size: 14px; line-height: 1.7; resize: none; }
 .content-input::placeholder { color: var(--text-muted); }
+.preview { border-left: 1px solid var(--border); }
+.preview-full { flex: 1; width: 100%; border-left: none; }
+.content-input-full { flex: 1; width: 100%; }
+.editor-divider { display: none; }
+.editor-area.split .content-input { display: block; }
+.editor-area.split .preview { display: block; }
+.editor-area.edit-only .content-input { display: block; }
+.editor-area.edit-only .preview { display: none; }
+.editor-area.preview-only .content-input { display: none; }
+.editor-area.preview-only .preview { display: block; }
+.content-input.hidden, .preview.hidden { display: none; }
 
 .preview h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; letter-spacing: -0.3px; }
 .preview h2 { font-size: 22px; font-weight: 600; margin: 20px 0 10px; }
