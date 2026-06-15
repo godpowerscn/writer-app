@@ -717,7 +717,9 @@ const app = {
     const md = state.article.content || '';
     this._isRendering = true;
     try {
-      $('contentInput').innerHTML = md ? (window.marked ? marked.parse(md) : '') : '';
+      // Sanitize legacy =WxH image size syntax (marked doesn't support it)
+      const cleanMd = md.replace(/!\[([^\]]*)\]\(([^)]*?)\s+=\d+(?:x\d*)?\)/g, '![$1]($2)');
+      $('contentInput').innerHTML = cleanMd ? (window.marked ? marked.parse(cleanMd) : '') : '';
     } finally {
       this._isRendering = false;
     }
