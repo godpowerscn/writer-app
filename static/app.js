@@ -94,15 +94,6 @@ const app = {
     await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags(), this.loadFonts()]);
     this.setupDragDrop();
     this.setupKeyboard();
-    // Deselect image resize on click outside
-    document.addEventListener('click', (e) => {
-      if (this._resizeImg && !e.target.closest('.inline-image-card') && !e.target.closest('#imageResizeOverlay')) {
-        this._deselectResizeImage();
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this._resizeImg) this._deselectResizeImage();
-    });
   },
 
   // ─── Drag & Drop ──────────────────────────────
@@ -751,17 +742,21 @@ const app = {
 
   // Initialize Vditor with the given markdown content
   _initVditor(content) {
-    if (vditor) {
+    if (vditor && _vditorReady) {
       vditor.setValue(content);
-      _vditorReady = true;
       state.isDirty = false;
       return;
     }
+    if (vditor) {
+      try { vditor.destroy(); } catch (e) {}
+      vditor = null;
+    }
     _vditorReady = false;
+    const el = $('vditor');
+    if (el) el.innerHTML = '';
     const token = getToken();
     vditor = new Vditor('vditor', {
-      cdn: 'https://cdnjs.cloudflare.com/ajax/libs/vditor/3.11.2',
-      _lutePath: 'https://cdnjs.cloudflare.com/ajax/libs/vditor/3.11.2/js/lute/lute.min.js',
+      cdn: 'https://registry.npmmirror.com/vditor/3.11.2/files',
       mode: 'ir',
       placeholder: '',
       toolbar: [],
