@@ -27,6 +27,14 @@ folders.put('/:id', async (c) => {
   return c.json(folder);
 });
 
+folders.post('/reorder', async (c) => {
+  const userId = c.get('userId');
+  const { items } = await c.req.json<{ items: { id: string; sort_order: number; parent_id?: string | null }[] }>();
+  if (!items?.length) return c.json({ success: true });
+  await db.reorderFolders(c.env.DB, userId, items);
+  return c.json({ success: true });
+});
+
 folders.delete('/:id', async (c) => {
   const userId = c.get('userId');
   await db.deleteFolder(c.env.DB, c.req.param('id'), userId);

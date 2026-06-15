@@ -40,6 +40,14 @@ articles.put('/:id', async (c) => {
   return c.json(article);
 });
 
+articles.post('/reorder', async (c) => {
+  const userId = c.get('userId');
+  const { items } = await c.req.json<{ items: { id: string; sort_order: number; folder_id?: string | null }[] }>();
+  if (!items?.length) return c.json({ success: true });
+  await db.reorderArticles(c.env.DB, userId, items);
+  return c.json({ success: true });
+});
+
 articles.delete('/:id', async (c) => {
   const userId = c.get('userId');
   const deleted = await db.deleteArticle(c.env.DB, userId, c.req.param('id'));

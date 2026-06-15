@@ -12,6 +12,7 @@ JWT_SECRET = "78dceeeb0c4a084c3b87c05b84da525b20a44c685471b3e73b9f6f48d91b0678"
 binding = "DB"
 database_name = "writer-app-db"
 database_id = "46c9a6a8-b206-4fcf-961a-cbca67ccd475"
+migrations_dir = "migrations"
 
 # ============================================================
 # Static Assets — frontend served from the Worker

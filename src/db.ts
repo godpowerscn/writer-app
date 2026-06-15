@@ -161,8 +161,8 @@ export async function createArticle(db: D1Database, userId: string, input: Creat
   const now = new Date().toISOString();
   const status = input.status ?? 'draft';
   await db
-    .prepare(`INSERT INTO articles (id, title, content, status, category_id, folder_id, user_id, created_at, updated_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.title ?? '', input.content ?? '', status, input.category_id ?? null, input.folder_id ?? null, userId, now, now, status === 'published' ? now : null)
+    .prepare(`INSERT INTO articles (id, title, content, status, category_id, folder_id, user_id, sort_order, created_at, updated_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.title ?? '', input.content ?? '', status, input.category_id ?? null, input.folder_id ?? null, userId, 0, now, now, status === 'published' ? now : null)
     .run();
   if (input.tag_ids?.length) {
     const stmt = db.prepare('INSERT OR IGNORE INTO article_tags (article_id, tag_id) VALUES (?, ?)');
@@ -181,6 +181,7 @@ export async function updateArticle(db: D1Database, userId: string, id: string, 
   if (input.excerpt !== undefined) { fields.push('excerpt = ?'); params.push(input.excerpt); }
   if (input.category_id !== undefined) { fields.push('category_id = ?'); params.push(input.category_id); }
   if (input.folder_id !== undefined) { fields.push('folder_id = ?'); params.push(input.folder_id); }
+  if (input.sort_order !== undefined) { fields.push('sort_order = ?'); params.push(input.sort_order); }
   if (input.status !== undefined) {
     fields.push('status = ?'); params.push(input.status);
     if (input.status === 'published' && existing.status !== 'published') { fields.push('published_at = ?'); params.push(new Date().toISOString()); }
@@ -204,6 +205,24 @@ export async function updateArticle(db: D1Database, userId: string, id: string, 
 export async function deleteArticle(db: D1Database, userId: string, id: string): Promise<boolean> {
   const result = await db.prepare('DELETE FROM articles WHERE id = ? AND user_id = ?').bind(id, userId).run();
   return result.meta.changes > 0;
+}
+
+// ─── Reorder ──────────────────────────────────────────────
+
+export async function reorderFolders(db: D1Database, userId: string, items: { id: string; sort_order: number; parent_id?: string | null }[]): Promise<void> {
+  const stmt = db.prepare('UPDATE folders SET sort_order = ?, parent_id = ?, updated_at = ? WHERE id = ? AND user_id = ?');
+  const now = new Date().toISOString();
+  for (const item of items) {
+    await stmt.bind(item.sort_order, item.parent_id ?? null, now, item.id, userId).run();
+  }
+}
+
+export async function reorderArticles(db: D1Database, userId: string, items: { id: string; sort_order: number; folder_id?: string | null }[]): Promise<void> {
+  const stmt = db.prepare('UPDATE articles SET sort_order = ?, folder_id = ?, updated_at = ? WHERE id = ? AND user_id = ?');
+  const now = new Date().toISOString();
+  for (const item of items) {
+    await stmt.bind(item.sort_order, item.folder_id ?? null, now, item.id, userId).run();
+  }
 }
 
 // ─── Categories ────────────────────────────────────────────

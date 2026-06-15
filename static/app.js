@@ -84,7 +84,173 @@ const app = {
   state,
   async init() {
     await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags()]);
+    this.setupDragDrop();
     this.setupKeyboard();
+  },
+
+  // ─── Drag & Drop ──────────────────────────────
+
+  _dragState: { type: null, id: null },
+
+  setupDragDrop() {
+    const tree = $('treeView');
+    if (tree._dd) return;
+    tree._dd = true;
+
+    tree.addEventListener('dragstart', (e) => {
+      const row = e.target.closest('.tree-node');
+      if (!row || row.dataset.type === 'root') { e.preventDefault(); return; }
+      this._dragState.type = row.dataset.type;
+      this._dragState.id = row.dataset.id;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.id);
+    });
+
+    tree.addEventListener('dragend', () => {
+      this._clearDropIndicators();
+      this._dragState.type = null;
+      this._dragState.id = null;
+    });
+
+    tree.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const row = e.target.closest('.tree-node');
+      if (!row || row.dataset.id === this._dragState.id) return;
+      // Block folder-on-article and article-on-article (different type) from showing indicators
+      const dragType = this._dragState.type;
+      const dropType = row.dataset.type;
+      if (dragType === 'folder' && dropType === 'article') return;
+      if (dragType === 'article' && dropType === 'folder') {
+        // Only allow dropping INTO folder, not before/after
+        this._clearDropIndicators();
+        row.classList.add('drag-over');
+        return;
+      }
+      this._clearDropIndicators();
+      const rect = row.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const h = rect.height;
+      if (dropType === 'root') {
+        row.classList.add('drag-over');
+      } else if (dropType === 'folder') {
+        const t = h * 0.25;
+        if (y < t) row.classList.add('drop-before');
+        else if (y > h - t) row.classList.add('drop-after');
+        else row.classList.add('drag-over');
+      } else {
+        row.classList.add(y < h / 2 ? 'drop-before' : 'drop-after');
+      }
+    });
+
+    tree.addEventListener('dragleave', (e) => {
+      const row = e.target.closest('.tree-node');
+      if (row) row.classList.remove('drag-over', 'drop-before', 'drop-after');
+    });
+
+    tree.addEventListener('drop', (e) => this._onDrop(e));
+  },
+
+  _clearDropIndicators() {
+    qa('.tree-node.dragging, .tree-node.drag-over, .tree-node.drop-before, .tree-node.drop-after', $('treeView'))
+      .forEach(el => el.classList.remove('dragging', 'drag-over', 'drop-before', 'drop-after'));
+  },
+
+  async _onDrop(e) {
+    e.preventDefault();
+    this._clearDropIndicators();
+    const drag = this._dragState;
+    if (!drag.id) return;
+    const dropRow = e.target.closest('.tree-node');
+    if (!dropRow || dropRow.dataset.id === drag.id) return;
+
+    try {
+      const dropType = dropRow.dataset.type;
+      const dropId = dropRow.dataset.id;
+      const isBefore = dropRow.classList.contains('drop-before');
+      const isAfter = dropRow.classList.contains('drop-after');
+      const isInto = dropRow.classList.contains('drag-over');
+
+      let moved = false;
+      if (drag.type === 'folder') {
+        moved = await this._dropFolder(drag.id, dropType, dropId, isBefore, isAfter, isInto);
+      } else if (drag.type === 'article') {
+        moved = await this._dropArticle(drag.id, dropType, dropId, isBefore, isAfter, isInto);
+      }
+      if (moved) {
+        await Promise.all([this.loadFolders(), this.loadArticles()]);
+        this.showToast('Moved', 'success');
+      }
+    } catch (err) {
+      this.showToast('Failed to move', 'error');
+    }
+  },
+
+  async _dropFolder(dragId, dropType, dropId, isBefore, isAfter, isInto) {
+    if (dropType !== 'folder' && dropType !== 'root') return false;
+    let newParentId;
+    let insertOrder;
+
+    if (dropType === 'root') {
+      newParentId = null;
+      insertOrder = 9999;
+    } else if (isInto) {
+      newParentId = dropId;
+      const siblings = state.folders.filter(f => f.parent_id === dropId && f.id !== dragId);
+      const maxOrder = siblings.reduce((m, f) => Math.max(m, f.sort_order || 0), 0);
+      insertOrder = maxOrder + 1;
+    } else {
+      const target = state.folders.find(f => f.id === dropId);
+      if (!target) return false;
+      newParentId = target.parent_id;
+      const siblings = state.folders.filter(f => f.parent_id === newParentId && f.id !== dragId);
+      siblings.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name));
+      const targetIdx = siblings.findIndex(f => f.id === dropId);
+      insertOrder = targetIdx >= 0 ? (isBefore ? targetIdx : targetIdx + 1) : siblings.length;
+      siblings.splice(insertOrder, 0, { id: dragId });
+      const items = siblings.map((f, i) => ({ id: f.id, parent_id: newParentId, sort_order: i }));
+      await api('/folders/reorder', { method: 'POST', body: JSON.stringify({ items }) });
+      return true;
+    }
+
+    await api(`/folders/${dragId}`, { method: 'PUT', body: JSON.stringify({ parent_id: newParentId, sort_order: insertOrder }) });
+    return true;
+  },
+
+  async _dropArticle(dragId, dropType, dropId, isBefore, isAfter, isInto) {
+    if (dropType !== 'folder' && dropType !== 'root' && dropType !== 'article') return false;
+    let newFolderId;
+    let insertOrder;
+
+    if (dropType === 'root') {
+      newFolderId = null;
+      insertOrder = 9999;
+    } else if (dropType === 'folder' && isInto) {
+      newFolderId = dropId;
+      const siblings = state.articles.filter(a => a.folder_id === dropId && a.id !== dragId);
+      const maxOrder = siblings.reduce((m, a) => Math.max(m, a.sort_order || 0), 0);
+      insertOrder = maxOrder + 1;
+    } else {
+      let target;
+      if (dropType === 'folder') {
+        target = { folder_id: state.folders.find(f => f.id === dropId)?.parent_id ?? null };
+      } else {
+        target = state.articles.find(a => a.id === dropId);
+      }
+      if (!target) return false;
+      newFolderId = target.folder_id ?? null;
+      const siblings = state.articles.filter(a => a.folder_id === (newFolderId ?? null) && a.id !== dragId);
+      siblings.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (b.updated_at || '').localeCompare(a.updated_at || ''));
+      const targetIdx = siblings.findIndex(a => a.id === dropId);
+      insertOrder = targetIdx >= 0 ? (isBefore ? targetIdx : targetIdx + 1) : (isBefore ? 0 : siblings.length);
+      siblings.splice(insertOrder, 0, { id: dragId });
+      const items = siblings.map((a, i) => ({ id: a.id, folder_id: newFolderId, sort_order: i }));
+      await api('/articles/reorder', { method: 'POST', body: JSON.stringify({ items }) });
+      return true;
+    }
+
+    await api(`/articles/${dragId}`, { method: 'PUT', body: JSON.stringify({ folder_id: newFolderId, sort_order: insertOrder }) });
+    return true;
   },
 
   // ─── Data Loading ──────────────────────────────────
@@ -222,7 +388,11 @@ const app = {
     const row = document.createElement('div');
     row.className = 'tree-node ' + node.type + (isActive ? ' active' : '');
     row.style.paddingLeft = (depth * 16 + 6) + 'px';
+    row.draggable = true;
+    row.dataset.type = node.type;
     row.dataset.id = node.id;
+    if (isFolder) row.dataset.parentId = node.data.parent_id || '';
+    if (isArticle) row.dataset.folderId = node.data.folder_id || '';
 
     // Toggle arrow
     const toggle = document.createElement('span');

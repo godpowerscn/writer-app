@@ -70,6 +70,7 @@ export interface UpdateArticleInput {
   status?: 'draft' | 'published';
   category_id?: string | null;
   folder_id?: string | null;
+  sort_order?: number;
   tag_ids?: string[];
 }
 
