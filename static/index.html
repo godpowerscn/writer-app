@@ -124,6 +124,16 @@
         </div>
         <div id="fontsList"></div>
       </div>
+      <hr class="settings-divider" />
+      <div class="settings-section">
+        <h4>Data Backup</h4>
+        <p class="settings-desc">Export all your articles, categories, tags, and folders as a JSON backup file. Import a backup to restore your data.</p>
+        <div class="data-actions">
+          <button class="btn-auth" onclick="app.exportData()" style="width:auto;padding:8px 20px">⬇ Export</button>
+          <button class="btn-auth" onclick="document.getElementById('importFileInput').click()" style="width:auto;padding:8px 20px;background:transparent;color:var(--text);border:1px solid var(--border)">⬆ Import</button>
+          <input type="file" id="importFileInput" accept=".json" hidden onchange="app.importData(this.files[0])" />
+        </div>
+      </div>
     </div>
   </div>
   <div id="imageModal" class="modal hidden" onclick="if(event.target===this)app.hideImagePicker()">

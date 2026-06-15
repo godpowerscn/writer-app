@@ -288,6 +288,12 @@ body {
 /* Editor Font Variable */
 :root { --font-editor: var(--font-mono); }
 
+/* Settings Divider */
+.settings-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+/* Data Actions */
+.data-actions { display: flex; gap: 8px; margin-top: 4px; }
+
 /* Image Modal */
 .image-modal { min-width: 460px; max-width: 520px; }
 .image-modal-tabs { display: flex; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }

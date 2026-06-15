@@ -832,6 +832,48 @@ const app = {
     root.style.setProperty('--font-editor', '"CustomEditorFont"');
   },
 
+  // ─── Data Backup ───────────────────────────────────
+
+  async exportData() {
+    const token = getToken();
+    try {
+      const r = await fetch('/api/data/export', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (!r.ok) throw new Error('Export failed');
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'writer-app-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      this.showToast('Data exported', 'success');
+    } catch (e) { this.showToast(e.message, 'error'); }
+  },
+
+  async importData(file) {
+    if (!file) return;
+    if (!confirm('Import will replace ALL current data (articles, categories, tags, folders). This cannot be undone. Continue?')) return;
+    const token = getToken();
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const r = await fetch('/api/data/import', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: form,
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'Import failed'); }
+      const result = await r.json();
+      this.showToast('Imported: ' + result.stats.articles + ' articles, ' + result.stats.categories + ' categories, ' + result.stats.tags + ' tags', 'success');
+      // Reload all data
+      await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags(), this.loadFonts()]);
+      this.renderEditor();
+      this.hideSettings();
+    } catch (e) { this.showToast(e.message, 'error'); }
+  },
+
   // ─── Image Insertion ────────────────────────────────
 
   _pendingImageFile: null,

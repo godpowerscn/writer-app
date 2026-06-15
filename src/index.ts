@@ -9,6 +9,7 @@ import auth from './routes/auth';
 import folders from './routes/folders';
 import fonts from './routes/fonts';
 import images from './routes/images';
+import data from './routes/data';
 
 const app = new Hono<AppBindings>();
 
@@ -43,6 +44,7 @@ app.route('/api/tags', tags);
 app.route('/api/folders', folders);
 app.route('/api/fonts', fonts);
 app.route('/api/images', images);
+app.route('/api/data', data);
 
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
