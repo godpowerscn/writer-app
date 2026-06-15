@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Writer App</title>
+  <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/vditor/3.11.2/index.min.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -75,7 +76,6 @@
           </div>
           <div class="toolbar-right">
             <button class="btn-icon" onclick="app.showImagePicker()" title="Insert Image">&#128247;</button>
-            <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
             <button class="btn-save" onclick="app.saveArticle()" title="Save (Ctrl+S)">Save</button>
             <button class="btn-delete" onclick="app.deleteArticle(app.state.selectedId)" title="Delete">&#128465;</button>
           </div>
@@ -89,11 +89,7 @@
         <div id="tabBar" class="tab-bar hidden"></div>
         <div class="editor-body">
           <input type="text" id="titleInput" class="title-input" placeholder="Untitled" oninput="app.onTitleChange()" />
-          <div id="editor-area" class="editor-area">
-            <textarea id="contentInput" class="content-input" placeholder="Start writing in markdown..." oninput="app.onContentChange()"></textarea>
-            <div id="inlineImages" class="inline-images"></div>
-            <div id="preview" class="preview hidden"></div>
-          </div>
+          <div id="vditor" class="vditor-reset"></div>
         </div>
 
         <div class="editor-footer">
@@ -183,11 +179,8 @@
       </div>
     </div>
   </div>
-  <div id="imageResizeOverlay" class="image-resize-overlay hidden">
-    <div class="resize-handle" id="resizeHandle"></div>
-  </div>
   <div id="toast" class="toast"></div>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/vditor/3.11.2/index.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

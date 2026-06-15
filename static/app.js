@@ -16,6 +16,8 @@ let state = {
 };
 // Per-tab article cache: tabId → { title, content, excerpt, status, category_id, tags, ... }
 let tabCache = {};
+let vditor = null;
+let _vditorReady = false;
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
@@ -552,10 +554,7 @@ const app = {
     this._openTab(id, false);
   },
 
-  _getMarkdown() {
-    this._syncImageWidths();
-    return $('contentInput')?.value || '';
-  },
+  _getMarkdown() { return vditor ? vditor.getValue() : ''; },
 
   _saveCurrentTabCache() {
     if (!state.activeTabId) return;
@@ -688,7 +687,7 @@ const app = {
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
   onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; const tab = state.openTabs.find(t => t.id === state.selectedId); if (tab) tab.title = $('titleInput').value || 'Untitled'; this.renderTree(); this.renderTabs(); } },
-  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); this.renderInlineImages(); },
+
 
   // ─── Tags ──────────────────────────────────────────
 
@@ -748,170 +747,66 @@ const app = {
     state.isDirty = true; this.renderTags(); this.autoSave();
   },
 
-  // ─── Editor & Render ──────────────────────────────
+  // ─── Editor & Render (Vditor) ────────────────────
 
-  // Parse textarea markdown and render images inline below it
-  renderInlineImages() {
-    const container = $('inlineImages');
-    const md = $('contentInput').value || '';
-    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    let html = '';
-    let match;
-    let idx = 0;
-    while ((match = imgRegex.exec(md)) !== null) {
-      let url = match[2].trim();
-      const alt = match[1] || '';
-      let width = '';
-      const titleMatch = url.match(/^(.*?)\s+"([^"]*)"$/);
-      if (titleMatch) {
-        url = titleMatch[1];
-        const title = titleMatch[2];
-        if (title.startsWith('w=')) width = title.slice(2);
-      }
-      html += '<div class="inline-image-card" data-img-idx="' + idx + '">'
-        + '<img src="' + this.escapeHtml(url) + '" alt="' + this.escapeHtml(alt) + '"'
-        + (width ? ' width="' + parseInt(width) + '"' : '')
-        + ' loading="lazy"></div>';
-      idx++;
+  // Initialize Vditor with the given markdown content
+  _initVditor(content) {
+    if (vditor) {
+      vditor.setValue(content);
+      _vditorReady = true;
+      state.isDirty = false;
+      return;
     }
-    container.innerHTML = html;
-    container.classList.toggle('hidden', !html);
-    // Attach click handlers for resize
-    if (html) {
-      container.querySelectorAll('.inline-image-card img').forEach((img, i) => {
-        img.onclick = () => this._selectResizeImage(img);
-      });
-    }
-  },
-
-  _deselectResizeImage() {
-    if (this._resizeImg) {
-      this._resizeImg.classList.remove('selected');
-      this._resizeImg = null;
-    }
-    $('imageResizeOverlay').classList.add('hidden');
-  },
-
-  _selectResizeImage(img) {
-    this._deselectResizeImage();
-    this._resizeImg = img;
-    img.classList.add('selected');
-    this._positionResizeOverlay();
-    $('imageResizeOverlay').classList.remove('hidden');
-    const handle = $('resizeHandle');
-    handle.onmousedown = (e) => this._startImageResize(e, img);
-  },
-
-  _positionResizeOverlay() {
-    const img = this._resizeImg;
-    if (!img) return;
-    const rect = img.getBoundingClientRect();
-    const ov = $('imageResizeOverlay');
-    ov.style.left = rect.left + 'px';
-    ov.style.top = rect.top + 'px';
-    ov.style.width = rect.width + 'px';
-    ov.style.height = rect.height + 'px';
-  },
-
-  _startImageResize(e, img) {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startW = img.getBoundingClientRect().width;
-    const startH = img.getBoundingClientRect().height;
-    const onMove = (ev) => {
-      const newW = Math.max(50, startW + (ev.clientX - startX));
-      const ratio = startH / startW;
-      img.style.width = newW + 'px';
-      img.style.height = Math.round(newW * ratio) + 'px';
-      img.removeAttribute('width');
-      this._positionResizeOverlay();
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  },
-
-  // Extract widths from rendered images and write back into textarea markdown
-  _syncImageWidths() {
-    const ta = $('contentInput');
-    const cards = $('inlineImages').querySelectorAll('.inline-image-card');
-    if (!cards.length) return;
-    let md = ta.value;
-    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    let result = '';
-    let lastIdx = 0;
-    let cardIdx = 0;
-    let match;
-    while ((match = imgRegex.exec(md)) !== null) {
-      result += md.slice(lastIdx, match.index);
-      let url = match[2].trim();
-      const alt = match[1] || '';
-      // Strip old title
-      const titleMatch = url.match(/^(.*?)\s+"([^"]*)"$/);
-      if (titleMatch) url = titleMatch[1];
-      // Check if rendered image has a width
-      const img = cards[cardIdx]?.querySelector('img');
-      const w = img ? (img.getAttribute('width') || img.style.width || '') : '';
-      const wNum = parseInt(w);
-      if (wNum > 0) {
-        result += '![' + alt + '](' + url + ' "w=' + wNum + '")';
-      } else {
-        result += '![' + alt + '](' + url + ')';
-      }
-      lastIdx = imgRegex.lastIndex;
-      cardIdx++;
-    }
-    result += md.slice(lastIdx);
-    if (result !== md) {
-      ta.value = result;
-      // Mark dirty so auto-save picks it up
-      state.isDirty = true;
-    }
-  },
-
-  renderPreview() {
-    const md = $('contentInput').value || '';
-    const cleanMd = md.replace(/"w=\d+"/g, '');
-    $('preview').innerHTML = cleanMd ? (window.marked ? marked.parse(cleanMd) : '') : '';
-  },
-
-  togglePreview() {
-    const area = $('editor-area');
-    const preview = $('preview');
-    const inline = $('inlineImages');
-    const ta = $('contentInput');
-    if (preview.classList.contains('hidden')) {
-      this.renderPreview();
-      preview.classList.remove('hidden');
-      inline.classList.add('hidden');
-      ta.classList.add('hidden');
-      $('previewBtn').classList.add('active');
-    } else {
-      preview.classList.add('hidden');
-      inline.classList.remove('hidden');
-      ta.classList.remove('hidden');
-      $('previewBtn').classList.remove('active');
-    }
+    _vditorReady = false;
+    const token = getToken();
+    vditor = new Vditor('vditor', {
+      cdn: 'https://cdn.bootcdn.net/ajax/libs/vditor/3.11.2',
+      mode: 'ir',
+      placeholder: '',
+      toolbar: [],
+      cache: { enable: false },
+      value: content,
+      input: () => {
+        state.isDirty = true;
+        this.autoSave();
+        this.updateWordCount();
+      },
+      upload: {
+        max: 20 * 1024 * 1024,
+        accept: 'image/*',
+        url: '/api/images/upload',
+        headers: { 'Authorization': 'Bearer ' + token },
+        fieldName: 'file',
+        filename: () => 'file',
+        success: (res) => {
+          try {
+            const d = JSON.parse(res);
+            const url = '/api/images/' + d.id + '/file?token=' + token;
+            return { msg: '', code: 0, data: { errFiles: [], succMap: { 'file': url } } };
+          } catch { return { msg: 'Upload failed', code: -1, data: null }; }
+        },
+      },
+      after: () => {
+        _vditorReady = true;
+        state.isDirty = false;
+      },
+    });
   },
 
   renderEditor() {
     if (!state.article) { $('emptyState').classList.remove('hidden'); $('editorContent').classList.add('hidden'); return; }
     $('emptyState').classList.add('hidden'); $('editorContent').classList.remove('hidden');
     $('titleInput').value = state.article.title || '';
-    $('contentInput').value = state.article.content || '';
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
-    $('preview').classList.add('hidden');
-    $('previewBtn').classList.remove('active');
-    $('contentInput').classList.remove('hidden');
-    this.renderTags(); this.updateWordCount(); this.renderInlineImages(); state.isDirty = false; $('saveStatus').textContent = '';
+    this.renderTags();
+    this._initVditor(state.article.content || '');
+    this.updateWordCount();
+    state.isDirty = false;
+    $('saveStatus').textContent = '';
   },
 
   updateWordCount() {
-    const t = $('contentInput').value || '';
+    const t = vditor ? vditor.getValue() : '';
     const w = t.trim() ? t.trim().split(/\s+/).length : 0;
     const c = t.length;
     $('wordCount').textContent = c > 0 ? w + ' words · ' + c + ' chars' : '0 words';
@@ -1127,8 +1022,8 @@ const app = {
       });
       if (!r.ok) { let err; try { const d = await r.json(); err = d.error; } catch {}; throw new Error(err || 'Upload failed'); }
       const img = await r.json();
-      const imgUrl = `/api/images/${img.id}/file?token=${token}`;
-      this.insertMarkdown('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
+      const imgUrl = '/api/images/' + img.id + '/file?token=' + token;
+      if (vditor) vditor.insertValue('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
       this.hideImagePicker();
       this.showToast('Image inserted', 'success');
     } catch (e) { this.showToast(e.message, 'error'); }
@@ -1150,20 +1045,9 @@ const app = {
     const url = $('imageUrlInput').value.trim();
     if (!url) { this.showToast('Please enter an image URL', 'error'); return; }
     const alt = $('imageUrlAltInput').value.trim() || '';
-    this.insertMarkdown('![' + alt + '](' + url + ')');
+    if (vditor) vditor.insertValue('![' + alt + '](' + url + ')');
     this.hideImagePicker();
     this.showToast('Image inserted', 'success');
-  },
-
-  insertMarkdown(md) {
-    const ta = $('contentInput');
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const text = ta.value;
-    ta.value = text.substring(0, start) + md + text.substring(end);
-    ta.selectionStart = ta.selectionEnd = start + md.length;
-    ta.focus();
-    this.onContentChange();
   },
 };
 
