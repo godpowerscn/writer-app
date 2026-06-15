@@ -760,7 +760,8 @@ const app = {
     _vditorReady = false;
     const token = getToken();
     vditor = new Vditor('vditor', {
-      cdn: 'https://cdn.jsdelivr.net/npm/vditor@3.11.2',
+      cdn: 'https://cdnjs.cloudflare.com/ajax/libs/vditor/3.11.2',
+      _lutePath: 'https://cdnjs.cloudflare.com/ajax/libs/vditor/3.11.2/js/lute/lute.min.js',
       mode: 'ir',
       placeholder: '',
       toolbar: [],
