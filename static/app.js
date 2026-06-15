@@ -11,7 +11,11 @@ let state = {
   expandedFolders: new Set(),
   fonts: [], activeFontId: null,
   activeTagId: null, activeTagName: null,
+  openTabs: [],        // Array of { id, title }
+  activeTabId: null,
 };
+// Per-tab article cache: tabId → { title, content, excerpt, status, category_id, tags, ... }
+let tabCache = {};
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
@@ -532,13 +536,121 @@ const app = {
     try {
       const body = {}; if (state.selectedFolderId) body.folder_id = state.selectedFolderId;
       const r = await api('/articles', { method: 'POST', body: JSON.stringify(body) });
-      const a = await r.json(); state.articles.unshift(a); this.renderTree(); this.selectArticle(a.id);
+      const a = await r.json(); state.articles.unshift(a); this.renderTree(); this._openTab(a.id, true);
     } catch (e) { this.showToast('Failed to create article', 'error'); }
   },
   async selectArticle(id) {
-    if (state.isDirty && !confirm('You have unsaved changes. Discard them?')) return;
-    state.selectedId = id; state.isDirty = false;
-    try { const r = await api(`/articles/${id}`); if (!r.ok) throw new Error(); state.article = await r.json(); this.renderEditor(); this.renderTree(); } catch (e) { this.showToast('Failed to load article', 'error'); }
+    if (state.openTabs.some(t => t.id === id)) { this._switchTab(id); return; }
+    this._openTab(id, false);
+  },
+
+  _saveCurrentTabCache() {
+    if (!state.activeTabId) return;
+    tabCache[state.activeTabId] = {
+      title: $('titleInput')?.value || '',
+      content: $('contentInput')?.innerHTML || '',
+      status: $('statusSelect')?.value || 'draft',
+      category_id: $('categorySelect')?.value || null,
+      tags: state.article?.tags ? JSON.parse(JSON.stringify(state.article.tags)) : [],
+    };
+  },
+
+  async _openTab(id, isNew) {
+    this._saveCurrentTabCache();
+    if (!isNew && !state.articles.find(a => a.id === id)) {
+      try { const r = await api(`/articles/${id}`); if (r.ok) state.article = await r.json(); else return; } catch { return; }
+    }
+    const entry = state.articles.find(a => a.id === id);
+    if (!state.openTabs.some(t => t.id === id)) {
+      state.openTabs.push({ id, title: entry?.title || 'Untitled' });
+    }
+    state.activeTabId = id;
+    state.selectedId = id;
+    state.isDirty = false;
+    if (!tabCache[id]) {
+      try {
+        const r = await api(`/articles/${id}`);
+        if (r.ok) {
+          const a = await r.json();
+          tabCache[id] = {
+            title: a.title, content: a.content,
+            status: a.status, category_id: a.category_id,
+            tags: a.tags ? JSON.parse(JSON.stringify(a.tags)) : [],
+          };
+          state.article = a;
+        }
+      } catch { this.showToast('Failed to load article', 'error'); return; }
+    } else {
+      const cached = tabCache[id];
+      state.article = { id, ...cached };
+    }
+    this.renderEditor();
+    this.renderTree();
+    this.renderTabs();
+  },
+
+  _switchTab(id) {
+    if (id === state.activeTabId) return;
+    this._saveCurrentTabCache();
+    state.activeTabId = id;
+    state.selectedId = id;
+    state.isDirty = false;
+    this._loadTabCache(id);
+    this.renderEditor();
+    this.renderTree();
+    this.renderTabs();
+  },
+
+  closeTab(id, force) {
+    if (!force && state.activeTabId === id && state.isDirty) {
+      if (!confirm('You have unsaved changes. Discard them?')) return;
+    }
+    const idx = state.openTabs.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    state.openTabs.splice(idx, 1);
+    delete tabCache[id];
+    if (state.activeTabId === id) {
+      if (state.openTabs.length > 0) {
+        const next = state.openTabs[Math.min(idx, state.openTabs.length - 1)];
+        this._switchTab(next.id);
+      } else {
+        state.activeTabId = null;
+        state.selectedId = null;
+        state.article = null;
+        tabCache = {};
+        this.renderEditor();
+        this.renderTabs();
+        this.renderTree();
+      }
+    } else {
+      this.renderTabs();
+    }
+    // Remove from tree if it was showing (don't refetch articles)
+    state.articles = state.articles.filter(a => a.id !== id || state.openTabs.some(t => t.id === a.id));
+    this.renderTree();
+  },
+
+  renderTabs() {
+    const bar = $('tabBar');
+    if (!bar) return;
+    if (!state.openTabs.length) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+    bar.classList.remove('hidden');
+    bar.innerHTML = '';
+    for (const tab of state.openTabs) {
+      const el = document.createElement('div');
+      el.className = 'tab-item' + (tab.id === state.activeTabId ? ' active' : '');
+      const title = document.createElement('span');
+      title.className = 'tab-title';
+      title.textContent = tab.title || 'Untitled';
+      title.onclick = () => this._switchTab(tab.id);
+      el.appendChild(title);
+      const close = document.createElement('span');
+      close.className = 'tab-close';
+      close.textContent = '\u00D7';
+      close.onclick = (e) => { e.stopPropagation(); this.closeTab(tab.id); };
+      el.appendChild(close);
+      bar.appendChild(el);
+    }
   },
   _getMarkdown() {
     const editor = $('contentInput');
@@ -678,11 +790,11 @@ const app = {
     if (!state.selectedId) return;
     const content = this._getMarkdown();
     const a = { title: $('titleInput').value, content, excerpt: content.slice(0, 200), status: $('statusSelect').value, category_id: $('categorySelect').value || null, tag_ids: state.article?.tags?.map(t => t.id) || [] };
-    try { const r = await api(`/articles/${state.selectedId}`, { method: 'PUT', body: JSON.stringify(a) }); if (!r.ok) throw new Error(); state.article = await r.json(); state.isDirty = false; const idx = state.articles.findIndex(x => x.id === state.selectedId); if (idx >= 0) state.articles[idx] = { ...state.articles[idx], ...state.article }; this.renderTree(); this.renderTags(); this.showToast('Saved', 'success'); $('saveStatus').textContent = ''; } catch (e) { this.showToast('Failed to save', 'error'); }
+    try { const r = await api(`/articles/${state.selectedId}`, { method: 'PUT', body: JSON.stringify(a) }); if (!r.ok) throw new Error(); state.article = await r.json(); state.isDirty = false; const idx = state.articles.findIndex(x => x.id === state.selectedId); if (idx >= 0) state.articles[idx] = { ...state.articles[idx], ...state.article }; if (tabCache[state.selectedId]) tabCache[state.selectedId] = { title: a.title, content: a.content, status: a.status, category_id: a.category_id, tags: JSON.parse(JSON.stringify(state.article.tags || [])) }; const tab = state.openTabs.find(t => t.id === state.selectedId); if (tab) tab.title = a.title; this.renderTree(); this.renderTags(); this.renderTabs(); this.showToast('Saved', 'success'); $('saveStatus').textContent = ''; } catch (e) { this.showToast('Failed to save', 'error'); }
   },
   async deleteArticle(id) {
     if (!confirm('Delete this article?')) return;
-    try { await api(`/articles/${id}`, { method: 'DELETE' }); state.articles = state.articles.filter(a => a.id !== id); if (state.selectedId === id) { state.article = null; state.selectedId = null; this.renderEditor(); } this.renderTree(); this.showToast('Deleted', 'success'); } catch (e) { this.showToast('Failed to delete', 'error'); }
+    try { await api(`/articles/${id}`, { method: 'DELETE' }); state.articles = state.articles.filter(a => a.id !== id); this.closeTab(id, true); this.showToast('Deleted', 'success'); } catch (e) { this.showToast('Failed to delete', 'error'); }
   },
   async search(query) {
     if (state.activeTagId) this.clearTagFilter();
@@ -691,7 +803,7 @@ const app = {
 
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
-  onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; this.renderTree(); } },
+  onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; const tab = state.openTabs.find(t => t.id === state.selectedId); if (tab) tab.title = $('titleInput').value || 'Untitled'; this.renderTree(); this.renderTabs(); } },
   onContentChange() { if (this._isRendering) return; state.isDirty = true; this.autoSave(); this.updateWordCount(); },
 
   // ─── Tags ──────────────────────────────────────────
