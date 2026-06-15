@@ -238,11 +238,11 @@ body {
 .preview a:hover { text-decoration: underline; }
 .preview hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 
-/* View modes */
-.editor-area.edit-only .content-input { display: block; width: 100%; }
-.editor-area.edit-only .preview { display: none; }
-.editor-area.split .content-input { display: block; }
-.editor-area.split .preview { display: block; }
+/* View modes — default to edit-only */
+.editor-area .content-input { display: block; width: 100%; }
+.editor-area .preview { display: none; }
+.editor-area.split .content-input { display: block; width: 50%; }
+.editor-area.split .preview { display: block; width: 50%; }
 .editor-area.preview-only .content-input { display: none; }
 .editor-area.preview-only .preview { display: block; width: 100%; border-left: none; }
 .hidden { display: none !important; }
