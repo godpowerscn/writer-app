@@ -92,6 +92,15 @@ const app = {
     await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags(), this.loadFonts()]);
     this.setupDragDrop();
     this.setupKeyboard();
+    // Deselect image resize on click outside
+    document.addEventListener('click', (e) => {
+      if (this._resizeImg && !e.target.closest('.inline-image-card') && !e.target.closest('#imageResizeOverlay')) {
+        this._deselectResizeImage();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this._resizeImg) this._deselectResizeImage();
+    });
   },
 
   // ─── Drag & Drop ──────────────────────────────
@@ -543,7 +552,10 @@ const app = {
     this._openTab(id, false);
   },
 
-  _getMarkdown() { return $('contentInput')?.value || ''; },
+  _getMarkdown() {
+    this._syncImageWidths();
+    return $('contentInput')?.value || '';
+  },
 
   _saveCurrentTabCache() {
     if (!state.activeTabId) return;
@@ -676,7 +688,7 @@ const app = {
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
   onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; const tab = state.openTabs.find(t => t.id === state.selectedId); if (tab) tab.title = $('titleInput').value || 'Untitled'; this.renderTree(); this.renderTabs(); } },
-  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); this.renderPreview(); },
+  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); this.renderInlineImages(); },
 
   // ─── Tags ──────────────────────────────────────────
 
@@ -738,25 +750,152 @@ const app = {
 
   // ─── Editor & Render ──────────────────────────────
 
+  // Parse textarea markdown and render images inline below it
+  renderInlineImages() {
+    const container = $('inlineImages');
+    const md = $('contentInput').value || '';
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let html = '';
+    let match;
+    let idx = 0;
+    while ((match = imgRegex.exec(md)) !== null) {
+      let url = match[2].trim();
+      const alt = match[1] || '';
+      let width = '';
+      const titleMatch = url.match(/^(.*?)\s+"([^"]*)"$/);
+      if (titleMatch) {
+        url = titleMatch[1];
+        const title = titleMatch[2];
+        if (title.startsWith('w=')) width = title.slice(2);
+      }
+      html += '<div class="inline-image-card" data-img-idx="' + idx + '">'
+        + '<img src="' + this.escapeHtml(url) + '" alt="' + this.escapeHtml(alt) + '"'
+        + (width ? ' width="' + parseInt(width) + '"' : '')
+        + ' loading="lazy"></div>';
+      idx++;
+    }
+    container.innerHTML = html;
+    container.classList.toggle('hidden', !html);
+    // Attach click handlers for resize
+    if (html) {
+      container.querySelectorAll('.inline-image-card img').forEach((img, i) => {
+        img.onclick = () => this._selectResizeImage(img);
+      });
+    }
+  },
+
+  _deselectResizeImage() {
+    if (this._resizeImg) {
+      this._resizeImg.classList.remove('selected');
+      this._resizeImg = null;
+    }
+    $('imageResizeOverlay').classList.add('hidden');
+  },
+
+  _selectResizeImage(img) {
+    this._deselectResizeImage();
+    this._resizeImg = img;
+    img.classList.add('selected');
+    this._positionResizeOverlay();
+    $('imageResizeOverlay').classList.remove('hidden');
+    const handle = $('resizeHandle');
+    handle.onmousedown = (e) => this._startImageResize(e, img);
+  },
+
+  _positionResizeOverlay() {
+    const img = this._resizeImg;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const ov = $('imageResizeOverlay');
+    ov.style.left = rect.left + 'px';
+    ov.style.top = rect.top + 'px';
+    ov.style.width = rect.width + 'px';
+    ov.style.height = rect.height + 'px';
+  },
+
+  _startImageResize(e, img) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = img.getBoundingClientRect().width;
+    const startH = img.getBoundingClientRect().height;
+    const onMove = (ev) => {
+      const newW = Math.max(50, startW + (ev.clientX - startX));
+      const ratio = startH / startW;
+      img.style.width = newW + 'px';
+      img.style.height = Math.round(newW * ratio) + 'px';
+      img.removeAttribute('width');
+      this._positionResizeOverlay();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  },
+
+  // Extract widths from rendered images and write back into textarea markdown
+  _syncImageWidths() {
+    const ta = $('contentInput');
+    const cards = $('inlineImages').querySelectorAll('.inline-image-card');
+    if (!cards.length) return;
+    let md = ta.value;
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let result = '';
+    let lastIdx = 0;
+    let cardIdx = 0;
+    let match;
+    while ((match = imgRegex.exec(md)) !== null) {
+      result += md.slice(lastIdx, match.index);
+      let url = match[2].trim();
+      const alt = match[1] || '';
+      // Strip old title
+      const titleMatch = url.match(/^(.*?)\s+"([^"]*)"$/);
+      if (titleMatch) url = titleMatch[1];
+      // Check if rendered image has a width
+      const img = cards[cardIdx]?.querySelector('img');
+      const w = img ? (img.getAttribute('width') || img.style.width || '') : '';
+      const wNum = parseInt(w);
+      if (wNum > 0) {
+        result += '![' + alt + '](' + url + ' "w=' + wNum + '")';
+      } else {
+        result += '![' + alt + '](' + url + ')';
+      }
+      lastIdx = imgRegex.lastIndex;
+      cardIdx++;
+    }
+    result += md.slice(lastIdx);
+    if (result !== md) {
+      ta.value = result;
+      // Mark dirty so auto-save picks it up
+      state.isDirty = true;
+    }
+  },
+
   renderPreview() {
     const md = $('contentInput').value || '';
-    const cleanMd = md.replace(/!\[([^\]]*)\]\(([^)]*?)\s+=\d+(?:x\d*)?\)/g, '![$1]($2)');
+    const cleanMd = md.replace(/"w=\d+"/g, '');
     $('preview').innerHTML = cleanMd ? (window.marked ? marked.parse(cleanMd) : '') : '';
   },
 
   togglePreview() {
     const area = $('editor-area');
-    if (area.classList.contains('split')) {
-      area.classList.replace('split', 'preview-only');
+    const preview = $('preview');
+    const inline = $('inlineImages');
+    const ta = $('contentInput');
+    if (preview.classList.contains('hidden')) {
+      this.renderPreview();
+      preview.classList.remove('hidden');
+      inline.classList.add('hidden');
+      ta.classList.add('hidden');
       $('previewBtn').classList.add('active');
-    } else if (area.classList.contains('preview-only')) {
-      area.classList.replace('preview-only', 'edit-only');
-      $('previewBtn').classList.remove('active');
     } else {
-      area.classList.replace('edit-only', 'split');
+      preview.classList.add('hidden');
+      inline.classList.remove('hidden');
+      ta.classList.remove('hidden');
       $('previewBtn').classList.remove('active');
     }
-    state.isPreview = area.classList.contains('preview-only');
   },
 
   renderEditor() {
@@ -765,9 +904,10 @@ const app = {
     $('titleInput').value = state.article.title || '';
     $('contentInput').value = state.article.content || '';
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
-    $('editor-area').className = 'editor-area edit-only';
+    $('preview').classList.add('hidden');
     $('previewBtn').classList.remove('active');
-    this.renderTags(); this.updateWordCount(); this.renderPreview(); state.isDirty = false; $('saveStatus').textContent = '';
+    $('contentInput').classList.remove('hidden');
+    this.renderTags(); this.updateWordCount(); this.renderInlineImages(); state.isDirty = false; $('saveStatus').textContent = '';
   },
 
   updateWordCount() {

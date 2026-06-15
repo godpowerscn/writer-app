@@ -91,7 +91,8 @@
           <input type="text" id="titleInput" class="title-input" placeholder="Untitled" oninput="app.onTitleChange()" />
           <div id="editor-area" class="editor-area">
             <textarea id="contentInput" class="content-input" placeholder="Start writing in markdown..." oninput="app.onContentChange()"></textarea>
-            <div id="preview" class="preview"></div>
+            <div id="inlineImages" class="inline-images"></div>
+            <div id="preview" class="preview hidden"></div>
           </div>
         </div>
 
@@ -181,6 +182,9 @@
         </div>
       </div>
     </div>
+  </div>
+  <div id="imageResizeOverlay" class="image-resize-overlay hidden">
+    <div class="resize-handle" id="resizeHandle"></div>
   </div>
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
