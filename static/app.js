@@ -389,7 +389,7 @@ const app = {
 
     const row = document.createElement('div');
     row.className = 'tree-node ' + node.type + (isActive ? ' active' : '');
-    row.style.paddingLeft = (depth * 16 + 6) + 'px';
+    row.style.paddingLeft = (depth * 20 + 8) + 'px';
     row.draggable = true;
     row.dataset.type = node.type;
     row.dataset.id = node.id;
