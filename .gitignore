@@ -3,3 +3,8 @@ dist/
 .dev.vars
 *.log
 worker-configuration.d.ts
+.wrangler/
+*.woff2
+*.ttf
+*.otf
+*.woff
