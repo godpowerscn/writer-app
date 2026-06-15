@@ -6,11 +6,12 @@ const articles = new Hono<AppBindings>();
 
 articles.get('/', async (c) => {
   const userId = c.get('userId');
-  const { status, categoryId, folderId, page, pageSize, search } = c.req.query();
+  const { status, categoryId, folderId, tagId, page, pageSize, search } = c.req.query();
   const result = await db.listArticles(c.env.DB, userId, {
     status,
     categoryId,
     folderId,
+    tagId,
     page: page ? parseInt(page) : 1,
     pageSize: pageSize ? parseInt(pageSize) : 20,
     search,

@@ -195,7 +195,11 @@ body {
 /* Tags Bar */
 .tags-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 24px; border-bottom: 1px solid var(--border); background: var(--bg-secondary); flex-shrink: 0; }
 .tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); font-size: 12px; color: var(--text-secondary); }
-.tag-chip .tag-remove { cursor: pointer; font-size: 14px; line-height: 1; color: var(--text-muted); }
+.tag-chip .tag-label { cursor: pointer; }
+.tag-chip .tag-label:hover { color: var(--accent); }
+.tag-chip.active { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+.tag-chip.active .tag-label { color: var(--accent); font-weight: 500; }
+.tag-chip .tag-remove { cursor: pointer; font-size: 14px; line-height: 1; color: var(--text-muted); margin-left: 2px; }
 .tag-chip .tag-remove:hover { color: var(--danger); }
 .tag-input { border: none; outline: none; background: transparent; font-size: 12px; color: var(--text-secondary); flex: 1; min-width: 80px; }
 .tag-input::placeholder { color: var(--text-muted); }

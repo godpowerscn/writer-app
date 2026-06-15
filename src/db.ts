@@ -115,7 +115,7 @@ export async function deleteFolder(db: D1Database, id: string, userId: string): 
 export async function listArticles(
   db: D1Database,
   userId: string,
-  options: { status?: string; categoryId?: string; folderId?: string; page?: number; pageSize?: number; search?: string } = {}
+  options: { status?: string; categoryId?: string; folderId?: string; tagId?: string; page?: number; pageSize?: number; search?: string } = {}
 ): Promise<{ data: any[]; total: number; page: number; pageSize: number }> {
   const page = options.page ?? 1;
   const pageSize = Math.min(options.pageSize ?? 20, 100);
@@ -125,10 +125,14 @@ export async function listArticles(
   if (options.status) { conditions.push('a.status = ?'); params.push(options.status); }
   if (options.categoryId) { conditions.push('a.category_id = ?'); params.push(options.categoryId); }
   if (options.folderId) { conditions.push('a.folder_id = ?'); params.push(options.folderId); }
+  if (options.tagId) {
+    conditions.push('a.id IN (SELECT at.article_id FROM article_tags at WHERE at.tag_id = ?)');
+    params.push(options.tagId);
+  }
   if (options.search) {
-    conditions.push('(a.title LIKE ? OR a.content LIKE ?)');
+    conditions.push('(a.title LIKE ? OR a.content LIKE ? OR a.id IN (SELECT at2.article_id FROM article_tags at2 JOIN tags t2 ON at2.tag_id = t2.id WHERE t2.name LIKE ?))');
     const term = `%${options.search}%`;
-    params.push(term, term);
+    params.push(term, term, term);
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const countResult = await db.prepare(`SELECT COUNT(*) as total FROM articles a ${where}`).bind(...params).first<{ total: number }>();

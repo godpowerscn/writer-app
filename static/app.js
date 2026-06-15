@@ -10,6 +10,7 @@ let state = {
   saveTimer: null, allTags: [],
   expandedFolders: new Set(),
   fonts: [], activeFontId: null,
+  activeTagId: null, activeTagName: null,
 };
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -261,7 +262,12 @@ const app = {
     try { const r = await api('/folders'); const d = await r.json(); state.folders = d.flat ?? []; } catch (e) {}
   },
   async loadArticles() {
-    try { const r = await api('/articles?pageSize=500'); const d = await r.json(); state.articles = d.data ?? d; this.renderTree(); } catch (e) {}
+    try {
+      const p = new URLSearchParams({ pageSize: '500' });
+      if (state.activeTagId) p.set('tagId', state.activeTagId);
+      const r = await api('/articles?' + p.toString());
+      const d = await r.json(); state.articles = d.data ?? d; this.renderTree();
+    } catch (e) {}
   },
   async loadCategories() {
     try { const r = await api('/categories'); const d = await r.json(); const s = $('categorySelect'); s.innerHTML = '<option value="">No Category</option>'; for (const c of d) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; s.appendChild(o); } } catch (e) {}
@@ -353,8 +359,9 @@ const app = {
       const row = document.createElement('div');
       row.className = 'tree-node root';
       row.style.paddingLeft = '6px';
-      row.innerHTML = '<span class="icon">&#128196;</span><span class="label">All Articles</span><span class="meta">' + state.articles.length + '</span>';
-      row.onclick = () => { state.selectedFolderId = null; this.loadArticles(); };
+      const labelText = state.activeTagName ? 'Tag: ' + state.activeTagName : 'All Articles';
+      row.innerHTML = '<span class="icon">&#128196;</span><span class="label">' + labelText + '</span><span class="meta">' + state.articles.length + '</span>';
+      row.onclick = () => { state.selectedFolderId = null; if (state.activeTagId) this.clearTagFilter(); else this.loadArticles(); };
       container.appendChild(row);
 
       const childWrap = document.createElement('div');
@@ -678,6 +685,7 @@ const app = {
     try { await api(`/articles/${id}`, { method: 'DELETE' }); state.articles = state.articles.filter(a => a.id !== id); if (state.selectedId === id) { state.article = null; state.selectedId = null; this.renderEditor(); } this.renderTree(); this.showToast('Deleted', 'success'); } catch (e) { this.showToast('Failed to delete', 'error'); }
   },
   async search(query) {
+    if (state.activeTagId) this.clearTagFilter();
     try { const p = new URLSearchParams({ search: query, pageSize: '50' }); const r = await api(`/articles?${p}`); const d = await r.json(); state.articles = d.data ?? d; this.renderTree(); } catch (e) {}
   },
 
@@ -691,10 +699,39 @@ const app = {
   renderTags() {
     const list = $('tagsList'); list.innerHTML = '';
     for (const tag of (state.article?.tags || [])) {
-      const c = document.createElement('span'); c.className = 'tag-chip';
-      c.innerHTML = this.escapeHtml(tag.name) + '<span class="tag-remove" onclick="app.removeTag(\'' + tag.id + '\')">&times;</span>';
+      const c = document.createElement('span'); c.className = 'tag-chip' + (state.activeTagId === tag.id ? ' active' : '');
+      const label = document.createElement('span');
+      label.className = 'tag-label';
+      label.textContent = tag.name;
+      label.onclick = (e) => { e.stopPropagation(); this.filterByTag(tag.id, tag.name); };
+      label.title = 'Filter by tag: ' + tag.name;
+      c.appendChild(label);
+      const remove = document.createElement('span');
+      remove.className = 'tag-remove';
+      remove.textContent = '\u00D7';
+      remove.onclick = (e) => { e.stopPropagation(); this.removeTag(tag.id); };
+      c.appendChild(remove);
       list.appendChild(c);
     }
+  },
+
+  filterByTag(tagId, tagName) {
+    if (state.activeTagId === tagId) { this.clearTagFilter(); return; }
+    state.activeTagId = tagId;
+    state.activeTagName = tagName;
+    state.selectedId = null;
+    state.article = null;
+    this.renderEditor();
+    this.loadArticles();
+    this.renderTags();
+    $('tagInput').placeholder = 'Filtering: ' + tagName + ' (click tag again to clear)';
+  },
+  clearTagFilter() {
+    state.activeTagId = null;
+    state.activeTagName = null;
+    $('tagInput').placeholder = 'Add tag...';
+    this.loadArticles();
+    this.renderTags();
   },
   async onTagKeydown(e) {
     if (e.key !== 'Enter') return;
