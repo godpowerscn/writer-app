@@ -92,7 +92,6 @@ const app = {
     await Promise.all([this.loadFolders(), this.loadArticles(), this.loadCategories(), this.loadAllTags(), this.loadFonts()]);
     this.setupDragDrop();
     this.setupKeyboard();
-    this.setupContentEditable();
   },
 
   // ─── Drag & Drop ──────────────────────────────
@@ -544,6 +543,8 @@ const app = {
     this._openTab(id, false);
   },
 
+  _getMarkdown() { return $('contentInput')?.value || ''; },
+
   _saveCurrentTabCache() {
     if (!state.activeTabId) return;
     tabCache[state.activeTabId] = {
@@ -655,139 +656,7 @@ const app = {
       bar.appendChild(el);
     }
   },
-  _getMarkdown() {
-    const editor = $('contentInput');
-    if (!editor.innerHTML || editor.innerHTML === '<br>') return '';
-    return this._htmlToMarkdown(editor);
-  },
 
-  _htmlToMarkdown(root) {
-    const lines = [];
-    const walk = (node, prefix) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent;
-        if (text) lines.push(text);
-        return;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return;
-      const tag = node.tagName.toLowerCase();
-      // Collect children text first, then wrap with markers
-      const childLines = [];
-      const savedLines = lines;
-      const childText = () => {
-        const start = lines.length;
-        for (const child of node.childNodes) walk(child);
-        return lines.splice(start).join('').replace(/\s+/g, ' ').trim();
-      };
-
-      // Inline elements — push text directly
-      if (tag === 'strong' || tag === 'b') { lines.push('**' + childText() + '**'); return; }
-      if (tag === 'em' || tag === 'i') { lines.push('*' + childText() + '*'); return; }
-      if (tag === 'a') {
-        const href = node.getAttribute('href') || '';
-        lines.push('[' + childText() + '](' + href + ')');
-        return;
-      }
-      if (tag === 'img') {
-        const src = node.getAttribute('src') || '';
-        const alt = node.getAttribute('alt') || '';
-        const w = node.getAttribute('width') || node.style.width || '';
-        const wNum = parseInt(w);
-        if (wNum > 0) {
-          // Persist custom width as raw HTML (marked passes it through)
-          lines.push('<img src="' + src + '" alt="' + alt + '" width="' + wNum + '">');
-        } else {
-          lines.push('![' + alt + '](' + src + ')');
-        }
-        return;
-      }
-      if (tag === 'code') {
-        lines.push('`' + (node.textContent || '') + '`');
-        return;
-      }
-      if (tag === 'br') { lines.push('\n'); return; }
-
-      // Block elements — collect sub-lines then append with formatting
-      const collectSubLines = () => {
-        const start = lines.length;
-        const subLines = [];
-        let paraAccum = '';
-        for (const child of node.childNodes) {
-          const beforeLen = lines.length;
-          walk(child);
-          if (lines.length > beforeLen) {
-            // Flush accumulated paragraph text
-            if (paraAccum) { subLines.push(paraAccum); paraAccum = ''; }
-            subLines.push(lines.splice(beforeLen).join(''));
-          } else {
-            // It's phrasing content — accumulate
-            const text = child.textContent || '';
-            if (child.nodeType === Node.TEXT_NODE && text.trim()) {
-              paraAccum += text.trim() + ' ';
-            }
-          }
-        }
-        if (paraAccum) subLines.push(paraAccum.trim());
-        return subLines;
-      };
-
-      if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
-        const level = '#'.repeat(parseInt(tag[1]));
-        const t = childText();
-        lines.push(level + ' ' + t);
-        lines.push('');
-        return;
-      }
-      if (tag === 'p') {
-        const t = childText();
-        if (t) { lines.push(t); lines.push(''); }
-        return;
-      }
-      if (tag === 'blockquote') {
-        const qLines = collectSubLines();
-        for (const ql of qLines) lines.push('> ' + ql);
-        lines.push('');
-        return;
-      }
-      if (tag === 'ul' || tag === 'ol') {
-        let idx = 1;
-        for (const li of node.children) {
-          if (li.tagName !== 'LI') continue;
-          const marker = tag === 'ul' ? '-' : (idx++) + '.';
-          // For list items, walk children manually
-          const start = lines.length;
-          for (const child of li.childNodes) walk(child);
-          const itemText = lines.splice(start).join('').replace(/\s+/g, ' ').trim();
-          lines.push(marker + ' ' + itemText);
-        }
-        lines.push('');
-        return;
-      }
-      if (tag === 'pre') {
-        const code = node.querySelector('code');
-        const codeText = code ? code.textContent : node.textContent;
-        lines.push('```');
-        lines.push(codeText);
-        lines.push('```');
-        lines.push('');
-        return;
-      }
-      if (tag === 'hr') { lines.push('---'); lines.push(''); return; }
-      // div, span, unknown — pass through children
-      for (const child of node.childNodes) walk(child);
-    };
-    walk(root, '');
-    // Clean up: remove duplicate blank lines
-    const result = [];
-    let prevBlank = false;
-    for (const line of lines) {
-      const blank = line.trim() === '';
-      if (blank && prevBlank) continue;
-      result.push(line);
-      prevBlank = blank;
-    }
-    return result.join('\n').trim();
-  },
 
   async saveArticle() {
     if (!state.selectedId) return;
@@ -807,7 +676,7 @@ const app = {
   onStatusChange() { state.isDirty = true; this.autoSave(); },
   onCategoryChange() { state.isDirty = true; this.autoSave(); },
   onTitleChange() { state.isDirty = true; this.autoSave(); if (state.selectedId) { const item = state.articles.find(a => a.id === state.selectedId); if (item) item.title = $('titleInput').value || 'Untitled'; const tab = state.openTabs.find(t => t.id === state.selectedId); if (tab) tab.title = $('titleInput').value || 'Untitled'; this.renderTree(); this.renderTabs(); } },
-  onContentChange() { if (this._isRendering) return; state.isDirty = true; this.autoSave(); this.updateWordCount(); },
+  onContentChange() { state.isDirty = true; this.autoSave(); this.updateWordCount(); this.renderPreview(); },
 
   // ─── Tags ──────────────────────────────────────────
 
@@ -869,25 +738,40 @@ const app = {
 
   // ─── Editor & Render ──────────────────────────────
 
+  renderPreview() {
+    const md = $('contentInput').value || '';
+    const cleanMd = md.replace(/!\[([^\]]*)\]\(([^)]*?)\s+=\d+(?:x\d*)?\)/g, '![$1]($2)');
+    $('preview').innerHTML = cleanMd ? (window.marked ? marked.parse(cleanMd) : '') : '';
+  },
+
+  togglePreview() {
+    const area = $('editor-area');
+    if (area.classList.contains('split')) {
+      area.classList.replace('split', 'preview-only');
+      $('previewBtn').classList.add('active');
+    } else if (area.classList.contains('preview-only')) {
+      area.classList.replace('preview-only', 'edit-only');
+      $('previewBtn').classList.remove('active');
+    } else {
+      area.classList.replace('edit-only', 'split');
+      $('previewBtn').classList.remove('active');
+    }
+    state.isPreview = area.classList.contains('preview-only');
+  },
+
   renderEditor() {
     if (!state.article) { $('emptyState').classList.remove('hidden'); $('editorContent').classList.add('hidden'); return; }
     $('emptyState').classList.add('hidden'); $('editorContent').classList.remove('hidden');
     $('titleInput').value = state.article.title || '';
-    const md = state.article.content || '';
-    this._isRendering = true;
-    try {
-      // Sanitize legacy =WxH image size syntax (marked doesn't support it)
-      const cleanMd = md.replace(/!\[([^\]]*)\]\(([^)]*?)\s+=\d+(?:x\d*)?\)/g, '![$1]($2)');
-      $('contentInput').innerHTML = cleanMd ? (window.marked ? marked.parse(cleanMd) : '') : '';
-    } finally {
-      this._isRendering = false;
-    }
+    $('contentInput').value = state.article.content || '';
     $('statusSelect').value = state.article.status || 'draft'; $('categorySelect').value = state.article.category_id || '';
-    this.renderTags(); this.updateWordCount(); state.isDirty = false; $('saveStatus').textContent = '';
+    $('editor-area').className = 'editor-area edit-only';
+    $('previewBtn').classList.remove('active');
+    this.renderTags(); this.updateWordCount(); this.renderPreview(); state.isDirty = false; $('saveStatus').textContent = '';
   },
 
   updateWordCount() {
-    const t = $('contentInput').textContent || '';
+    const t = $('contentInput').value || '';
     const w = t.trim() ? t.trim().split(/\s+/).length : 0;
     const c = t.length;
     $('wordCount').textContent = c > 0 ? w + ' words · ' + c + ' chars' : '0 words';
@@ -898,6 +782,7 @@ const app = {
     document.addEventListener('keydown', (e) => {
       const mod = navigator.platform.includes('Mac') ? e.metaKey : e.ctrlKey;
       if (mod && e.key === 's') { e.preventDefault(); this.saveArticle(); }
+      if (mod && e.key === 'p') { e.preventDefault(); this.togglePreview(); }
       if (mod && e.key === 'n') { e.preventDefault(); this.newArticle(); }
     });
   },
@@ -1103,7 +988,7 @@ const app = {
       if (!r.ok) { let err; try { const d = await r.json(); err = d.error; } catch {}; throw new Error(err || 'Upload failed'); }
       const img = await r.json();
       const imgUrl = `/api/images/${img.id}/file?token=${token}`;
-      this.insertHTML('<img src="' + imgUrl + '" alt="' + this.escapeHtml(alt) + '" style="max-width:100%" />');
+      this.insertMarkdown('![' + this.escapeHtml(alt) + '](' + imgUrl + ')');
       this.hideImagePicker();
       this.showToast('Image inserted', 'success');
     } catch (e) { this.showToast(e.message, 'error'); }
@@ -1125,113 +1010,20 @@ const app = {
     const url = $('imageUrlInput').value.trim();
     if (!url) { this.showToast('Please enter an image URL', 'error'); return; }
     const alt = $('imageUrlAltInput').value.trim() || '';
-    this.insertHTML('<img src="' + this.escapeHtml(url) + '" alt="' + this.escapeHtml(alt) + '" style="max-width:100%" />');
+    this.insertMarkdown('![' + alt + '](' + url + ')');
     this.hideImagePicker();
     this.showToast('Image inserted', 'success');
   },
 
-  insertHTML(html) {
-    const editor = $('contentInput');
-    editor.focus();
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const frag = range.createContextualFragment(html);
-      range.insertNode(frag);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } else {
-      editor.insertAdjacentHTML('beforeend', html);
-    }
-    this.onContentChange();
-  },
-
   insertMarkdown(md) {
-    const html = window.marked ? marked.parse(md) : md;
-    this.insertHTML(html);
-  },
-
-  // ─── Content Editable & Image Resize ──────────────
-
-  _selectedImg: null,
-
-  setupContentEditable() {
-    const editor = $('contentInput');
-    editor.addEventListener('click', (e) => this._onEditorClick(e));
-    document.addEventListener('click', (e) => {
-      if (this._selectedImg && !e.target.closest('#contentInput')) this._deselectImage();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this._selectedImg) this._deselectImage();
-    });
-    editor.addEventListener('scroll', () => { if (this._selectedImg) this._positionOverlay(); });
-  },
-
-  _onEditorClick(e) {
-    const img = e.target.closest('img');
-    if (img) {
-      e.preventDefault();
-      this._selectImage(img);
-      return;
-    }
-    if (this._selectedImg) this._deselectImage();
-  },
-
-  _selectImage(img) {
-    this._deselectImage();
-    this._selectedImg = img;
-    img.classList.add('selected-img');
-    this._positionOverlay();
-    $('imageResizeOverlay').classList.remove('hidden');
-    // Attach resize drag to handle
-    const handle = $('resizeHandleSE');
-    handle.onmousedown = (e) => this._startResize(e, img);
-  },
-
-  _deselectImage() {
-    if (this._selectedImg) {
-      this._selectedImg.classList.remove('selected-img');
-      this._selectedImg = null;
-    }
-    $('imageResizeOverlay').classList.add('hidden');
-  },
-
-  _positionOverlay() {
-    const img = this._selectedImg;
-    if (!img) return;
-    const rect = img.getBoundingClientRect();
-    const overlay = $('imageResizeOverlay');
-    overlay.style.left = rect.left + 'px';
-    overlay.style.top = rect.top + 'px';
-    overlay.style.width = rect.width + 'px';
-    overlay.style.height = rect.height + 'px';
-  },
-
-  _startResize(e, img) {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startW = img.getBoundingClientRect().width;
-    const startH = img.getBoundingClientRect().height;
-
-    const onMove = (ev) => {
-      const newW = Math.max(50, startW + (ev.clientX - startX));
-      const ratio = startH / startW;
-      const newH = Math.round(newW * ratio);
-      img.style.width = newW + 'px';
-      img.style.height = newH + 'px';
-      this._positionOverlay();
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      state.isDirty = true;
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    const ta = $('contentInput');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    ta.value = text.substring(0, start) + md + text.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + md.length;
+    ta.focus();
+    this.onContentChange();
   },
 };
 

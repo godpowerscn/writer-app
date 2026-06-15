@@ -75,6 +75,7 @@
           </div>
           <div class="toolbar-right">
             <button class="btn-icon" onclick="app.showImagePicker()" title="Insert Image">&#128247;</button>
+            <button class="btn-icon" id="previewBtn" onclick="app.togglePreview()" title="Preview (Ctrl+P)">&#128065;</button>
             <button class="btn-save" onclick="app.saveArticle()" title="Save (Ctrl+S)">Save</button>
             <button class="btn-delete" onclick="app.deleteArticle(app.state.selectedId)" title="Delete">&#128465;</button>
           </div>
@@ -89,7 +90,8 @@
         <div class="editor-body">
           <input type="text" id="titleInput" class="title-input" placeholder="Untitled" oninput="app.onTitleChange()" />
           <div id="editor-area" class="editor-area">
-            <div id="contentInput" class="content-input" contenteditable="true" oninput="app.onContentChange()"></div>
+            <textarea id="contentInput" class="content-input" placeholder="Start writing in markdown..." oninput="app.onContentChange()"></textarea>
+            <div id="preview" class="preview hidden"></div>
           </div>
         </div>
 
@@ -179,9 +181,6 @@
         </div>
       </div>
     </div>
-  </div>
-  <div id="imageResizeOverlay" class="image-resize-overlay hidden">
-    <div class="resize-handle-se" id="resizeHandleSE"></div>
   </div>
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
